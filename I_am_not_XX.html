@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>私は✕✕ではありません</title>
+  <style>
+    :root {
+      --bg-color: #f9f9f9;
+      --card-bg: #ffffff;
+      --border-color: #d3d3d3;
+      --text-main: #222222;
+      --text-sub: #555555;
+      --error-color: #d93025;
+      --success-color: #1e8e3e;
+      --accent-color: #1a73e8;
+      --box-shadow: 0 0 4px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.08);
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: var(--bg-color);
+      font-family: var(--font-family);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Container Card */
+    .captcha-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
+      box-shadow: var(--box-shadow);
+      width: 330px;
+      padding: 16px 20px;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Standardized Checkbox UI styling */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      margin: 12px 0;
+      position: relative;
+      min-height: 40px;
+    }
+
+    .checkbox-box {
+      width: 28px;
+      height: 28px;
+      border: 2px solid #c1c1c1;
+      border-radius: 2px;
+      background-color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      flex-shrink: 0;
+      position: relative;
+      transition: border-color 0.15s ease;
+    }
+
+    .checkbox-box:hover {
+      border-color: #b2b2b2;
+    }
+
+    .checkbox-label {
+      font-size: 14px;
+      color: var(--text-main);
+      cursor: pointer;
+      line-height: 1.3;
+    }
+
+    /* Unified Checkmark Look (SVG) */
+    .check-svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+
+    .check-svg path {
+      fill: none;
+      stroke: #098842;
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Unified '✕' Error Mark Look */
+    .cross-mark {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--error-color);
+      font-family: Arial, sans-serif;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Draggable Elements Wrapper Styling */
+    .draggable-obj {
+      position: absolute;
+      cursor: grab;
+      z-index: 1000;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .draggable-obj:active {
+      cursor: grabbing;
+    }
+
+    .draggable-obj.dragging {
+      opacity: 0.9;
+      transform: scale(1.1);
+      z-index: 2000;
+    }
+
+    /* Spinner Container & SVG */
+    .spinner-slot {
+      width: 28px;
+      height: 28px;
+      margin-left: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .spinner-svg {
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+    }
+
+    .spinner-svg circle {
+      fill: none;
+      stroke: var(--accent-color);
+      stroke-width: 3;
+      stroke-dasharray: 50;
+      stroke-dashoffset: 15;
+      stroke-linecap: round;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Status & Error Message Area */
+    .status-msg {
+      color: var(--text-sub);
+      font-size: 12px;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+
+    .error-msg {
+      color: var(--error-color);
+      font-size: 11.5px;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      min-height: 20px;
+      white-space: nowrap;
+      letter-spacing: -0.2px;
+    }
+
+    .success-msg {
+      color: var(--success-color);
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      white-space: nowrap;
+    }
+
+    /* Buttons and Navigation Styles */
+    .btn {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: #1557b0;
+    }
+
+    .btn-secondary {
+      background-color: #f1f3f4;
+      color: var(--text-sub);
+      border: 1px solid #dadce0;
+      margin-top: 8px;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e8eaed;
+      color: #202124;
+    }
+
+    .reset-link {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      font-size: 11px;
+      color: #70757a;
+      text-decoration: underline;
+      cursor: pointer;
+      z-index: 100;
+    }
+
+    /* Analytics Dashboard Panel */
+    .stats-card {
+      margin-top: 14px;
+      background: #f1f3f4;
+      border-radius: 4px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #444;
+      border: 1px solid #e0e0e0;
+    }
+
+    .stats-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      text-align: center;
+    }
+
+    .stats-val {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    /* Footer Branding Mock */
+    .captcha-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 16px;
+      padding-top: 10px;
+      border-top: 1px solid #f1f1f1;
+    }
+
+    .brand-text {
+      font-size: 10px;
+      color: #999;
+      text-align: right;
+    }
+
+    /* Clear Card */
+    .clear-card {
+      text-align: center;
+      padding: 16px 8px;
+    }
+
+    .clear-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--success-color);
+      margin-bottom: 12px;
+    }
+
+    .clear-textarea {
+      width: 100%;
+      height: 85px;
+      font-size: 11px;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      resize: none;
+      background: #f8f9fa;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .url-input-group {
+      margin-top: 8px;
+      text-align: left;
+    }
+
+    .url-input-group label {
+      font-size: 11px;
+      color: #666;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .url-input {
+      width: 100%;
+      padding: 6px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+
+    /* Checkmark Slide Animation for Stage 2 */
+    .s2-selection-check {
+      position: fixed;
+      pointer-events: none;
+      z-index: 100;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'i-am-not-xx-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let hasRecordedVisit = false;
+
+    if (firebaseConfig) {
+      const app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+
+      async function initAuthentication() {
+        try {
+          if (initialAuthToken) {
+            await signInWithCustomToken(auth, initialAuthToken);
+          } else {
+            await signInAnonymously(auth);
+          }
+        } catch (err) {
+          console.warn("Auth initialization fallback:", err);
+        }
+      }
+
+      onAuthStateChanged(auth, (user) => {
+        if (!user) return;
+        currentUser = user;
+        recordVisit();
+        listenToAnalytics();
+      });
+
+      initAuthentication();
+    }
+
+    async function recordVisit() {
+      if (!db || !currentUser || hasRecordedVisit) return;
+      hasRecordedVisit = true;
+      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
+
+      try {
+        const snap = await getDoc(statsRef);
+        if (!snap.exists()) {
+          await setDoc(statsRef, { visitCount: 1, clearCount: 0, redirectCount: 0, totalClearSeconds: 0 });
+        } else {
+          await updateDoc(statsRef, { visitCount: increment(1) });
+        }
+      } catch (err) {
+        console.error("Error recording visit:", err);
+      }
+    }
+
+    window.recordClearToDatabase = async function(elapsedSeconds) {
+      if (!db || !currentUser) return;
+      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
+
+      try {
+        const snap = await getDoc(statsRef);
+        if (!snap.exists()) {
+          await setDoc(statsRef, { visitCount: 1, clearCount: 1, redirectCount: 0, totalClearSeconds: elapsedSeconds });
+        } else {
+          await updateDoc(statsRef, {
+            clearCount: increment(1),
+            totalClearSeconds: increment(elapsedSeconds)
+          });
+        }
+      } catch (err) {
+        console.error("Error recording clear:", err);
+      }
+    };
+
+    window.recordRedirectToDatabase = async function() {
+      if (!db || !currentUser) return;
+      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
+
+      try {
+        const snap = await getDoc(statsRef);
+        if (!snap.exists()) {
+          await setDoc(statsRef, { visitCount: 1, clearCount: 0, redirectCount: 1, totalClearSeconds: 0 });
+        } else {
+          await updateDoc(statsRef, { redirectCount: increment(1) });
+        }
+      } catch (err) {
+        console.error("Error recording redirect:", err);
+      }
+    };
+
+    function listenToAnalytics() {
+      if (!db || !currentUser) return;
+      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
+
+      onSnapshot(statsRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const visits = data.visitCount || 0;
+          const clears = data.clearCount || 0;
+          const redirects = data.redirectCount || 0;
+          const totalSec = data.totalClearSeconds || 0;
+          const avgSec = clears > 0 ? Math.round(totalSec / clears) : 0;
+
+          document.getElementById('statVisits').textContent = visits;
+          document.getElementById('statClears').textContent = clears;
+          document.getElementById('statRedirects').textContent = redirects;
+          document.getElementById('statAvgTime').textContent = formatSeconds(avgSec);
+        }
+      }, (err) => {
+        console.error("Analytics listener error:", err);
+      });
+    }
+
+    function formatSeconds(sec) {
+      if (!sec || sec <= 0) return '0秒';
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return m > 0 ? `${m}分${s}秒` : `${s}秒`;
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Game Card Container -->
+  <div class="captcha-card" id="captchaCard">
+    
+    <!-- STAGE 1 UI -->
+    <div id="stage1">
+      <div class="checkbox-row">
+        <div class="checkbox-box" id="s1Box" onclick="handleStage1Click()">
+          <div id="s1BoxContent"></div>
+        </div>
+        <div class="checkbox-label" onclick="handleStage1Click()">私は人間ではありません</div>
+        <div class="spinner-slot" id="s1SpinnerSlot"></div>
+      </div>
+
+      <div class="status-msg" id="s1StatusMsg"></div>
+      <div class="error-msg" id="s1ErrorMsg"></div>
+    </div>
+
+    <!-- STAGE 2 UI -->
+    <div id="stage2" class="hidden">
+      <div class="checkbox-row">
+        <div class="checkbox-box" id="s2BoxRobot" onclick="handleStage2Click('robot')">
+          <div id="s2BoxRobotContent"></div>
+        </div>
+        <div class="checkbox-label" onclick="handleStage2Click('robot')">私はロボットではありません</div>
+        <div class="spinner-slot" id="s2SpinnerSlotRobot"></div>
+      </div>
+
+      <div class="checkbox-row">
+        <div class="checkbox-box" id="s2BoxHuman" onclick="handleStage2Click('human')">
+          <div id="s2BoxHumanContent"></div>
+        </div>
+        <div class="checkbox-label" onclick="handleStage2Click('human')">私は組織の検閲者ではありません</div>
+        <div class="spinner-slot" id="s2SpinnerSlotHuman"></div>
+      </div>
+
+      <div class="status-msg" id="s2StatusMsg"></div>
+      <div class="error-msg" id="s2Msg"></div>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        <button class="btn" onclick="submitStage2()">決定</button>
+        <button class="btn btn-secondary" onclick="returnToStage1()">１つ前の認証に戻る</button>
+      </div>
+    </div>
+
+    <!-- CLEAR STAGE UI -->
+    <div id="stageClear" class="hidden clear-card">
+      <div class="clear-title">認証に成功しました。</div>
+      
+      <textarea class="clear-textarea" id="postText" readonly></textarea>
+      
+      <button class="btn" style="background-color: #000; width: 100%;" onclick="shareToX()">Xにクリアポストする</button>
+
+      <div style="display: flex; gap: 6px; margin-top: 4px;">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="fullResetGame()">もう一度最初から認証する</button>
+      </div>
+      
+      <div class="url-input-group">
+        <label for="redirectUrl">遷移先URL (編集可能):</label>
+        <input type="text" id="redirectUrl" class="url-input" value="https://example.com" />
+      </div>
+
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="navigateToTarget()">アクセスする</button>
+    </div>
+
+    <!-- Analytics Dashboard View -->
+    <div class="stats-card">
+      <div class="stats-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        アクセス統計
+      </div>
+      <div class="stats-grid">
+        <div>
+          <div style="color:#777; font-size:10px;">アクセス数</div>
+          <div class="stats-val" id="statVisits">-</div>
+        </div>
+        <div>
+          <div style="color:#777; font-size:10px;">クリア数</div>
+          <div class="stats-val" id="statClears">-</div>
+        </div>
+        <div>
+          <div style="color:#777; font-size:10px;">遷移数</div>
+          <div class="stats-val" id="statRedirects">-</div>
+        </div>
+        <div>
+          <div style="color:#777; font-size:10px;">平均タイム</div>
+          <div class="stats-val" id="statAvgTime">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="captcha-footer">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4285f4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <div class="brand-text">
+        プライバシー - 利用規約
+      </div>
+    </div>
+  </div>
+
+  <div class="reset-link" onclick="fullResetGame()">最初からやり直す</div>
+
+  <script>
+    // --- Global Game State & Timer ---
+    let currentStage = 1;
+    let s1Checked = false;
+    let s1Processing = false;
+    let s1SpinnerAttached = false; // スピナーが第1ステージのスロットにセットされているか
+    let s2Selected = null; // 'robot' or 'human'
+    let s2Processing = false; // 第二ステージの検証中フラグ
+    let s2ExternalChecked = { robot: false, human: false };
+    
+    // Stage 2 Smooth Moving Selection Checkmark Element
+    let s2SelectionCheckEl = null;
+
+    // Flag to track if player actively touched/dragged the spinner
+    let spinnerTouched = false;
+
+    // Timers for auto-clearing error messages
+    let s1ErrorTimer = null;
+    let s2ErrorTimer = null;
+
+    // Timer Tracking
+    let gameStartTime = Date.now();
+
+    // Persistent Draggable Elements State
+    let draggedItems = {
+      cross: null,    // Stage 1 '✕' object
+      spinner: null,  // Loading spinner object
+      check: null     // Checkmark '✓' object
+    };
+
+    // Helper SVG/HTML generators
+    function createCheckSVG() {
+      return `<svg class="check-svg" viewBox="0 0 24 24">
+        <path d="M4 12l5 5L20 6" />
+      </svg>`;
+    }
+
+    function createCrossMarkHTML() {
+      return `<span class="cross-mark">✕</span>`;
+    }
+
+    function createSpinnerSVG() {
+      return `<svg class="spinner-svg" viewBox="0 0 50 50">
+        <circle cx="25" cy="25" r="20"></circle>
+      </svg>`;
+    }
+
+    function makeDraggable(element, id, onDropCallback, onTouchStartCallback) {
+      let isDragging = false;
+      let startX, startY, initialLeft, initialTop;
+
+      element.classList.add('draggable-obj');
+      element.id = id;
+
+      function onStart(e) {
+        if (element.dataset.disabled === 'true') return;
+        isDragging = true;
+        element.dataset.moved = 'true';
+        element.classList.add('dragging');
+        element.style.transition = 'none'; // Drag during free movement disable smooth transitions
+
+        if (onTouchStartCallback) {
+          onTouchStartCallback(element);
+        }
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        startX = clientX;
+        startY = clientY;
+
+        const rect = element.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        document.body.appendChild(element);
+        element.style.position = 'fixed';
+        element.style.left = initialLeft + 'px';
+        element.style.top = initialTop + 'px';
+        element.style.margin = '0';
+
+        e.preventDefault();
+      }
+
+      function onMove(e) {
+        if (!isDragging) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const deltaX = clientX - startX;
+        const deltaY = clientY - startY;
+
+        element.style.left = (initialLeft + deltaX) + 'px';
+        element.style.top = (initialTop + deltaY) + 'px';
+
+        e.preventDefault();
+      }
+
+      function onEnd(e) {
+        if (!isDragging) return;
+        isDragging = false;
+        element.classList.remove('dragging');
+
+        const rect = element.getBoundingClientRect();
+        const dropX = rect.left + rect.width / 2;
+        const dropY = rect.top + rect.height / 2;
+
+        if (onDropCallback) {
+          onDropCallback(dropX, dropY, element);
+        }
+      }
+
+      element.addEventListener('mousedown', onStart);
+      element.addEventListener('touchstart', onStart, { passive: false });
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('touchmove', onMove, { passive: false });
+
+      window.addEventListener('mouseup', onEnd);
+      window.addEventListener('touchend', onEnd);
+    }
+
+    function isInside(x, y, targetEl) {
+      if (!targetEl) return false;
+      const rect = targetEl.getBoundingClientRect();
+      return (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
+    }
+
+    function handleStage1Click() {
+      if (s1Checked) return;
+
+      if (s1ErrorTimer) {
+        clearTimeout(s1ErrorTimer);
+        s1ErrorTimer = null;
+      }
+
+      // 現在スピナーが第1ステージのスロットに正しくセットされているか判定
+      const isSlow = s1SpinnerAttached && draggedItems.spinner !== null;
+      const statusMsg = document.getElementById('s1StatusMsg');
+
+      // スピナーがセットされている場合、1回目のクリックですぐにドラッグ可能なチェックマークを生成し検証中メッセージを表示
+      if (isSlow) {
+        if (statusMsg) statusMsg.textContent = '「私は人間ではありません」を検証中...';
+
+        if (!draggedItems.check) {
+          spawnDraggableCheckMark(document.getElementById('s1Box'));
+        }
+
+        if (!s1Processing) {
+          s1Processing = true;
+          setTimeout(() => {
+            if (statusMsg) statusMsg.textContent = '';
+
+            const spinnerSlot = document.getElementById('s1SpinnerSlot');
+            if (spinnerSlot) spinnerSlot.innerHTML = '';
+            if (draggedItems.spinner) {
+              if (draggedItems.spinner.parentNode) {
+                draggedItems.spinner.parentNode.removeChild(draggedItems.spinner);
+              }
+              draggedItems.spinner = null;
+            }
+
+            // チェックマーク：ユーザーが移動させていなかった場合のみ消去
+            if (draggedItems.check) {
+              const wasMoved = draggedItems.check.dataset.moved === 'true' || draggedItems.check.classList.contains('dragging');
+              if (!wasMoved) {
+                if (draggedItems.check.parentNode) {
+                  draggedItems.check.parentNode.removeChild(draggedItems.check);
+                }
+                draggedItems.check = null;
+              }
+            }
+
+            const boxContent = document.getElementById('s1BoxContent');
+            if (boxContent) boxContent.innerHTML = '';
+
+            s1SpinnerAttached = false; // スピナー消去に伴い遅延フラグ解除
+            s1Processing = false;
+
+            if (!s1Checked) {
+              showStage1Error();
+            }
+          }, 3000);
+        }
+        return;
+      }
+
+      if (s1Processing) return;
+
+      s1Processing = true;
+      const boxContent = document.getElementById('s1BoxContent');
+      const spinnerSlot = document.getElementById('s1SpinnerSlot');
+      const errorMsg = document.getElementById('s1ErrorMsg');
+      errorMsg.innerHTML = '';
+      errorMsg.className = 'error-msg';
+
+      // チェックマークを表示
+      boxContent.innerHTML = createCheckSVG();
+
+      // 「検証中...」のメッセージを超超一瞬表示（ローディングマークは表示しない）
+      if (statusMsg) statusMsg.textContent = '「私は人間ではありません」を検証中...';
+
+      // 超高速（40ms）ののち直ちにエラーへ移行（「検証完了」は挟まない）
+      setTimeout(() => {
+        if (statusMsg) statusMsg.textContent = '';
+        boxContent.innerHTML = '';
+
+        s1Processing = false;
+        showStage1Error();
+      }, 40);
+    }
+
+    function showStage1Error() {
+      if (s1ErrorTimer) clearTimeout(s1ErrorTimer);
+
+      const statusMsg = document.getElementById('s1StatusMsg');
+      if (statusMsg) statusMsg.textContent = '';
+
+      const errorMsg = document.getElementById('s1ErrorMsg');
+      errorMsg.className = 'error-msg';
+      errorMsg.innerHTML = `<span style="display:inline-block; width:18px;"></span><span id="s1ErrorText">認証エラー: ここにアクセスできるのは人間のみです</span>`;
+
+      if (!draggedItems.cross) {
+        spawnDraggableCross();
+      } else {
+        const errorText = document.getElementById('s1ErrorText');
+        if (errorText) {
+          const rect = errorText.getBoundingClientRect();
+          draggedItems.cross.style.position = 'fixed';
+          draggedItems.cross.style.left = (rect.left - 20) + 'px';
+          draggedItems.cross.style.top = (rect.top - 2) + 'px';
+          draggedItems.cross.style.display = 'flex';
+        }
+      }
+
+      // Automatically hide error message after 4 seconds if not successfully checked
+      s1ErrorTimer = setTimeout(() => {
+        if (!s1Checked) {
+          const cross = draggedItems.cross;
+          const isDraggingCross = cross && cross.classList.contains('dragging');
+          if (!isDraggingCross) {
+            errorMsg.innerHTML = '';
+            if (cross && cross.parentNode) {
+              cross.parentNode.removeChild(cross);
+            }
+            draggedItems.cross = null;
+          }
+        }
+      }, 4000);
+    }
+
+    function spawnDraggableCross() {
+      const errorText = document.getElementById('s1ErrorText');
+      if (!errorText) return;
+
+      const rect = errorText.getBoundingClientRect();
+      const crossDiv = document.createElement('div');
+      crossDiv.innerHTML = createCrossMarkHTML();
+      crossDiv.style.left = (rect.left - 20) + 'px';
+      crossDiv.style.top = (rect.top - 2) + 'px';
+      
+      document.body.appendChild(crossDiv);
+      draggedItems.cross = crossDiv;
+
+      makeDraggable(crossDiv, 'draggableCross', (x, y, el) => {
+        const s1Box = document.getElementById('s1Box');
+        if (isInside(x, y, s1Box)) {
+          // Drop cross on checkbox
+          el.style.display = 'none';
+          
+          const boxContent = document.getElementById('s1BoxContent');
+          boxContent.innerHTML = createCrossMarkHTML();
+
+          // Display success state in error area
+          const msgArea = document.getElementById('s1ErrorMsg');
+          msgArea.className = 'success-msg';
+          msgArea.innerHTML = `認証完了`;
+
+          s1Checked = true;
+
+          // Pause briefly before proceeding to Stage 2
+          setTimeout(() => {
+            advanceToStage2();
+          }, 1500);
+        }
+      });
+    }
+
+    function spawnDraggableCheckMark(parentBox) {
+      const rect = parentBox.getBoundingClientRect();
+      const checkDiv = document.createElement('div');
+      checkDiv.innerHTML = createCheckSVG();
+      // Ensure the container perfectly matches the source checkbox bounds for zero displacement
+      checkDiv.style.width = rect.width + 'px';
+      checkDiv.style.height = rect.height + 'px';
+      checkDiv.style.left = rect.left + 'px';
+      checkDiv.style.top = rect.top + 'px';
+      
+      document.body.appendChild(checkDiv);
+      draggedItems.check = checkDiv;
+
+      document.getElementById('s1BoxContent').innerHTML = '';
+
+      makeDraggable(checkDiv, 'draggableCheck', (x, y, el) => {
+        if (currentStage === 2) {
+          if (s2Processing) {
+            showStage2BusyMessage();
+            return;
+          }
+          const boxRobot = document.getElementById('s2BoxRobot');
+          const boxHuman = document.getElementById('s2BoxHuman');
+
+          if (isInside(x, y, boxRobot)) {
+            applyCheckToStage2('robot', el);
+          } else if (isInside(x, y, boxHuman)) {
+            applyCheckToStage2('human', el);
+          }
+        }
+      }, (el) => {
+        if (el) el.dataset.moved = 'true';
+      });
+    }
+
+    function advanceToStage2() {
+      currentStage = 2;
+      document.getElementById('stage1').classList.add('hidden');
+      document.getElementById('stage2').classList.remove('hidden');
+    }
+
+    function resetStage1State() {
+      if (s1ErrorTimer) {
+        clearTimeout(s1ErrorTimer);
+        s1ErrorTimer = null;
+      }
+      s1Checked = false;
+      s1Processing = false;
+      document.getElementById('s1BoxContent').innerHTML = '';
+      const statusMsg = document.getElementById('s1StatusMsg');
+      if (statusMsg) statusMsg.textContent = '';
+      const errorMsg = document.getElementById('s1ErrorMsg');
+      errorMsg.innerHTML = '';
+      errorMsg.className = 'error-msg';
+
+      if (draggedItems.cross) {
+        draggedItems.cross.style.display = 'none';
+        draggedItems.cross = null;
+      }
+    }
+
+    function handleStage2Click(type) {
+      if (s2Processing) {
+        showStage2BusyMessage();
+        return;
+      }
+      s2Selected = type;
+      updateStage2SelectionCheckmark();
+    }
+
+    function showStage2BusyMessage() {
+      const msg = document.getElementById('s2Msg');
+      msg.style.color = 'var(--error-color)';
+      msg.textContent = '認証処理中のため選択項目を変更できません';
+
+      if (s2ErrorTimer) clearTimeout(s2ErrorTimer);
+      s2ErrorTimer = setTimeout(() => {
+        if (msg.textContent === '認証処理中のため選択項目を変更できません') {
+          msg.textContent = '';
+        }
+      }, 3000);
+    }
+
+    function updateStage2SelectionCheckmark() {
+      if (!s2Selected) return;
+
+      const targetBoxId = (s2Selected === 'robot') ? 's2BoxRobot' : 's2BoxHuman';
+      const targetBox = document.getElementById(targetBoxId);
+      if (!targetBox) return;
+
+      const rect = targetBox.getBoundingClientRect();
+
+      // Create selection checkmark element if not present
+      if (!s2SelectionCheckEl) {
+        s2SelectionCheckEl = document.createElement('div');
+        s2SelectionCheckEl.className = 's2-selection-check';
+        s2SelectionCheckEl.innerHTML = createCheckSVG();
+        
+        // Initial placement without transition
+        s2SelectionCheckEl.style.transition = 'none';
+        s2SelectionCheckEl.style.left = rect.left + 'px';
+        s2SelectionCheckEl.style.top = rect.top + 'px';
+        s2SelectionCheckEl.style.transform = 'scale(0)';
+        document.body.appendChild(s2SelectionCheckEl);
+
+        // Trigger scale pop in
+        requestAnimationFrame(() => {
+          s2SelectionCheckEl.style.transition = 'left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease';
+          s2SelectionCheckEl.style.transform = 'scale(1)';
+        });
+      } else {
+        // Smoothly slide checkmark to new selected target
+        s2SelectionCheckEl.style.display = 'flex';
+        s2SelectionCheckEl.style.transform = 'scale(1.15)';
+        s2SelectionCheckEl.style.left = rect.left + 'px';
+        s2SelectionCheckEl.style.top = rect.top + 'px';
+
+        setTimeout(() => {
+          if (s2SelectionCheckEl) {
+            s2SelectionCheckEl.style.transform = 'scale(1)';
+          }
+        }, 200);
+      }
+    }
+
+    function spawnDraggableSpinner() {
+      const slot = document.getElementById('s2SpinnerSlotRobot');
+      const rect = slot.getBoundingClientRect();
+
+      const spinnerDiv = document.createElement('div');
+      spinnerDiv.innerHTML = createSpinnerSVG();
+      spinnerDiv.style.position = 'fixed';
+      spinnerDiv.style.left = rect.left + 'px';
+      spinnerDiv.style.top = rect.top + 'px';
+
+      document.body.appendChild(spinnerDiv);
+      draggedItems.spinner = spinnerDiv;
+
+      makeDraggable(spinnerDiv, 'draggableSpinner', 
+        (x, y, el) => {
+          if (currentStage === 1) {
+            const s1Slot = document.getElementById('s1SpinnerSlot');
+            if (isInside(x, y, s1Slot)) {
+              s1SpinnerAttached = true;
+              const slotRect = s1Slot.getBoundingClientRect();
+              el.style.transition = 'left 0.3s ease-out, top 0.3s ease-out';
+              el.style.left = slotRect.left + 'px';
+              el.style.top = slotRect.top + 'px';
+            } else {
+              s1SpinnerAttached = false;
+            }
+          } else {
+            s1SpinnerAttached = false;
+          }
+        },
+        (el) => {
+          // Player touched/dragged the spinner
+          spinnerTouched = true;
+          s1SpinnerAttached = false;
+          if (el) el.style.transition = 'none';
+        }
+      );
+    }
+
+    function moveSpinnerToSlot(slotId, animate = true) {
+      const slot = document.getElementById(slotId);
+      if (slot && draggedItems.spinner) {
+        const rect = slot.getBoundingClientRect();
+        draggedItems.spinner.style.position = 'fixed';
+        if (animate) {
+          draggedItems.spinner.style.transition = 'left 0.45s cubic-bezier(0.4, 0, 0.2, 1), top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+        } else {
+          draggedItems.spinner.style.transition = 'none';
+        }
+        draggedItems.spinner.style.left = rect.left + 'px';
+        draggedItems.spinner.style.top = rect.top + 'px';
+      }
+    }
+
+    function applyCheckToStage2(targetType, checkEl) {
+      s2ExternalChecked[targetType] = true;
+      checkEl.style.display = 'none';
+
+      const targetBoxContent = document.getElementById(targetType === 'robot' ? 's2BoxRobotContent' : 's2BoxHumanContent');
+      targetBoxContent.innerHTML = createCheckSVG();
+    }
+
+    function returnToStage1() {
+      currentStage = 1;
+      s2Processing = false;
+
+      const statusMsg = document.getElementById('s2StatusMsg');
+      if (statusMsg) statusMsg.textContent = '';
+      const msg = document.getElementById('s2Msg');
+      if (msg) msg.textContent = '';
+
+      // Hide Stage 2 selection checkmark on returning
+      if (s2SelectionCheckEl) {
+        s2SelectionCheckEl.style.display = 'none';
+      }
+
+      // If spinner was spawned but never touched/dragged, destroy it on return
+      if (draggedItems.spinner && !spinnerTouched) {
+        if (draggedItems.spinner.parentNode) {
+          draggedItems.spinner.parentNode.removeChild(draggedItems.spinner);
+        }
+        draggedItems.spinner = null;
+      }
+
+      document.getElementById('stage2').classList.add('hidden');
+      document.getElementById('stage1').classList.remove('hidden');
+
+      resetStage1State();
+    }
+
+    function submitStage2() {
+      if (s2Processing) return;
+      s2Processing = true;
+
+      if (s2ErrorTimer) {
+        clearTimeout(s2ErrorTimer);
+        s2ErrorTimer = null;
+      }
+
+      const statusMsg = document.getElementById('s2StatusMsg');
+      const msg = document.getElementById('s2Msg');
+      msg.textContent = '';
+
+      const hasRobot = (s2Selected === 'robot' || s2ExternalChecked.robot);
+      const hasHuman = (s2Selected === 'human' || s2ExternalChecked.human);
+
+      // 決定ボタン押下時、片側選択・未選択に関わらず必ず両方の検証演出（ロボット→検閲者）を実行
+      if (!draggedItems.spinner) {
+        spinnerTouched = false;
+        spawnDraggableSpinner();
+      } else if (!spinnerTouched) {
+        moveSpinnerToSlot('s2SpinnerSlotRobot', true);
+      }
+
+      statusMsg.style.color = 'var(--text-sub)';
+      statusMsg.textContent = '「私はロボットではありません」を検証中...';
+
+      // 段階1: 「私はロボットではありません」の検証（約1.2秒）
+      setTimeout(() => {
+        // プレイヤーが自らスピナーを移動させていない場合「私は組織の検閲者ではありません」の右側スロットへ移動
+        if (draggedItems.spinner && !spinnerTouched) {
+          moveSpinnerToSlot('s2SpinnerSlotHuman', true);
+        }
+        statusMsg.textContent = '「私は組織の検閲者ではありません」を検証中...';
+
+        // 段階2: 「私は組織の検閲者ではありません」の検証（約1.2秒）を経た後に最終判定
+        setTimeout(() => {
+          statusMsg.textContent = '';
+
+          // 成功・失敗にかかわらず、検証完了時にチェックマークおよび選択状態を消去
+          document.getElementById('s2BoxRobotContent').innerHTML = '';
+          document.getElementById('s2BoxHumanContent').innerHTML = '';
+          if (s2SelectionCheckEl) {
+            s2SelectionCheckEl.style.display = 'none';
+          }
+          s2Selected = null;
+          s2ExternalChecked = { robot: false, human: false };
+
+          if (hasRobot && hasHuman) {
+            msg.style.color = 'var(--success-color)';
+            msg.textContent = '検証完了';
+
+            setTimeout(() => {
+              s2Processing = false;
+              showClearScreen();
+            }, 800);
+          } else {
+            s2Processing = false;
+            msg.style.color = 'var(--error-color)';
+
+            // 手動ドラッグされていない場合はスピナーを削除
+            if (draggedItems.spinner && !spinnerTouched) {
+              if (draggedItems.spinner.parentNode) {
+                draggedItems.spinner.parentNode.removeChild(draggedItems.spinner);
+              }
+              draggedItems.spinner = null;
+            }
+
+            if (hasRobot && !hasHuman) {
+              msg.textContent = '検閲者ではないことを認証できません';
+            } else if (!hasRobot && hasHuman) {
+              msg.textContent = 'ロボットではないことを認証できません';
+            } else {
+              msg.textContent = '選択してください';
+            }
+
+            // 4秒後にエラーメッセージを自動消去
+            s2ErrorTimer = setTimeout(() => {
+              if (
+                msg.textContent === '検閲者ではないことを認証できません' ||
+                msg.textContent === 'ロボットではないことを認証できません' ||
+                msg.textContent === '選択してください'
+              ) {
+                msg.textContent = '';
+              }
+            }, 4000);
+          }
+        }, 1200);
+      }, 1200);
+    }
+
+    function showClearScreen() {
+      document.getElementById('stage2').classList.add('hidden');
+      document.getElementById('stageClear').classList.remove('hidden');
+
+      if (s2SelectionCheckEl) {
+        s2SelectionCheckEl.style.display = 'none';
+      }
+
+      Object.values(draggedItems).forEach(item => {
+        if (item) item.style.display = 'none';
+      });
+
+      // Calculate elapsed time in seconds
+      const elapsedSeconds = Math.max(1, Math.floor((Date.now() - gameStartTime) / 1000));
+      if (window.recordClearToDatabase) {
+        window.recordClearToDatabase(elapsedSeconds);
+      }
+
+      // Include Site URL in the X post template
+      const currentUrl = window.location.href;
+      const postTemplate = `【認証完了】\n\n「▢私は✕✕ではありません」\n\nこのポストの送信者は認証に成功しました\n\n✕✕✕✕へのアクセス、閲覧が可能になりました\n\n${currentUrl}`;
+      document.getElementById('postText').value = postTemplate;
+    }
+
+    function shareToX() {
+      const text = encodeURIComponent(document.getElementById('postText').value);
+      const url = `https://twitter.com/intent/tweet?text=${text}`;
+      window.open(url, '_blank');
+    }
+
+    function navigateToTarget() {
+      const url = document.getElementById('redirectUrl').value;
+      if (url) {
+        if (window.recordRedirectToDatabase) {
+          window.recordRedirectToDatabase();
+        }
+        window.location.href = url;
+      }
+    }
+
+    function fullResetGame() {
+      if (s1ErrorTimer) { clearTimeout(s1ErrorTimer); s1ErrorTimer = null; }
+      if (s2ErrorTimer) { clearTimeout(s2ErrorTimer); s2ErrorTimer = null; }
+
+      if (s2SelectionCheckEl && s2SelectionCheckEl.parentNode) {
+        s2SelectionCheckEl.parentNode.removeChild(s2SelectionCheckEl);
+        s2SelectionCheckEl = null;
+      }
+
+      Object.values(draggedItems).forEach(item => {
+        if (item && item.parentNode) {
+          item.parentNode.removeChild(item);
+        }
+      });
+
+      currentStage = 1;
+      s1Checked = false;
+      s1Processing = false;
+      s1SpinnerAttached = false;
+      s2Selected = null;
+      s2Processing = false;
+      s2ExternalChecked = { robot: false, human: false };
+      spinnerTouched = false;
+
+      // Reset timer
+      gameStartTime = Date.now();
+
+      draggedItems = { cross: null, spinner: null, check: null };
+
+      document.getElementById('stageClear').classList.add('hidden');
+      document.getElementById('stage2').classList.add('hidden');
+      document.getElementById('stage1').classList.remove('hidden');
+
+      document.getElementById('s1BoxContent').innerHTML = '';
+      document.getElementById('s1SpinnerSlot').innerHTML = '';
+      const s1Status = document.getElementById('s1StatusMsg');
+      if (s1Status) s1Status.textContent = '';
+      document.getElementById('s1ErrorMsg').innerHTML = '';
+      
+      document.getElementById('s2BoxRobotContent').innerHTML = '';
+      document.getElementById('s2BoxHumanContent').innerHTML = '';
+      document.getElementById('s2StatusMsg').textContent = '';
+      document.getElementById('s2Msg').textContent = '';
+    }
+  </script>
+</body>
+</html>
