@@ -621,6 +621,9 @@
     // Timers for auto-clearing error messages
     let s1ErrorTimer = null;
     let s2ErrorTimer = null;
+    let s2VerificationTimer1 = null;
+    let s2VerificationTimer2 = null;
+    let s2VerificationFastMode = false;
 
     // Timer Tracking
     let gameStartTime = Date.now();
@@ -1098,6 +1101,9 @@
           spinnerTouched = true;
           s1SpinnerAttached = false;
           if (el) el.style.transition = 'none';
+          if (currentStage === 2 && typeof window._s2FastVerify === 'function') {
+            window._s2FastVerify();
+          }
         }
       );
     }
@@ -1159,6 +1165,8 @@
     function submitStage2() {
       if (s2Processing) return;
       s2Processing = true;
+      // 前回ローディングマークを外している場合は、次の「決定」も爆速処理にする
+      s2VerificationFastMode = spinnerTouched;
 
       // 認証中は「１つ前の認証に戻る」ボタンを無効化
       const returnBtn = document.getElementById('returnStage1Btn');
@@ -1187,78 +1195,107 @@
       statusMsg.style.color = 'var(--text-sub)';
       statusMsg.textContent = '「私は悪意のある利用者ではありません」を検証中...';
 
-      // 段階1: 「私は悪意のある利用者ではありません」の検証（約1.2秒）
-      setTimeout(() => {
+      // 段階2の処理
+      const runStage2Verification = () => {
+        statusMsg.textContent = '';
+
+        // 成功・失敗にかかわらず、検証完了時にチェックマークおよび選択状態を消去
+        document.getElementById('s2BoxRobotContent').innerHTML = '';
+        document.getElementById('s2BoxHumanContent').innerHTML = '';
+        if (s2SelectionCheckEl) {
+          s2SelectionCheckEl.style.display = 'none';
+        }
+        s2Selected = null;
+        s2ExternalChecked = { robot: false, human: false };
+
+        if (hasRobot && hasHuman) {
+          // 「検証完了」に切り替わった時点でローディングマークを消す
+          // （CLEAR画面への切り替えまで残らないようにする）
+          if (draggedItems.spinner) {
+            draggedItems.spinner.style.display = 'none';
+          }
+
+          msg.style.color = 'var(--success-color)';
+          msg.textContent = '検証完了';
+
+          setTimeout(() => {
+            s2Processing = false;
+            showClearScreen();
+          }, 800);
+        } else {
+          s2Processing = false;
+          if (returnBtn) returnBtn.disabled = false;
+          msg.style.color = 'var(--error-color)';
+
+          // 手動ドラッグされていない場合はスピナーを削除
+          if (draggedItems.spinner && !spinnerTouched) {
+            if (draggedItems.spinner.parentNode) {
+              draggedItems.spinner.parentNode.removeChild(draggedItems.spinner);
+            }
+            draggedItems.spinner = null;
+          }
+
+          if (hasRobot && !hasHuman) {
+            msg.textContent = '組織の脅威調査員ではないことを認証できません';
+          } else if (!hasRobot && hasHuman) {
+            msg.textContent = '悪意のある利用者ではないことを認証できません';
+          } else {
+            msg.textContent = '選択してください';
+          }
+
+          // 4秒後にエラーメッセージを自動消去
+          s2ErrorTimer = setTimeout(() => {
+            if (
+              msg.textContent === '検閲者ではないことを認証できません' ||
+              msg.textContent === 'ロボットではないことを認証できません' ||
+              msg.textContent === '選択してください'
+            ) {
+              msg.textContent = '';
+            }
+          }, 4000);
+        }
+      };
+
+      // 段階1の処理
+      const runStage1Verification = () => {
         // プレイヤーが自らスピナーを移動させていない場合「私は組織の脅威調査員ではありません」の右側スロットへ移動
         if (draggedItems.spinner && !spinnerTouched) {
           moveSpinnerToSlot('s2SpinnerSlotHuman', true);
         }
         statusMsg.textContent = '「私は組織の脅威調査員ではありません」を検証中...';
 
-        // 段階2: 「私は組織の脅威調査員ではありません」の検証（約1.2秒）を経た後に最終判定
-        setTimeout(() => {
-          statusMsg.textContent = '';
+        // 段階2: 「私は組織の脅威調査員ではありません」の検証
+        s2VerificationTimer2 = setTimeout(() => {
+          s2VerificationTimer2 = null;
+          runStage2Verification();
+        }, s2VerificationFastMode ? 50 : 1200);
+      };
 
-          // 成功・失敗にかかわらず、検証完了時にチェックマークおよび選択状態を消去
-          document.getElementById('s2BoxRobotContent').innerHTML = '';
-          document.getElementById('s2BoxHumanContent').innerHTML = '';
-          if (s2SelectionCheckEl) {
-            s2SelectionCheckEl.style.display = 'none';
-          }
-          s2Selected = null;
-          s2ExternalChecked = { robot: false, human: false };
+      // 第2ステージでも、ローディングマークを元の場所から動かしたら
+      // 第1ステージと同じ爆速処理に切り替える
+      window._s2FastVerify = () => {
+        if (!s2Processing || !spinnerTouched) return;
+        s2VerificationFastMode = true;
 
-          if (hasRobot && hasHuman) {
-            // 「検証完了」に切り替わった時点でローディングマークを消す
-            // （CLEAR画面への切り替えまで残らないようにする）
-            if (draggedItems.spinner) {
-              draggedItems.spinner.style.display = 'none';
-            }
+        if (s2VerificationTimer1) {
+          clearTimeout(s2VerificationTimer1);
+          s2VerificationTimer1 = null;
+          runStage1Verification();
+        } else if (s2VerificationTimer2) {
+          clearTimeout(s2VerificationTimer2);
+          s2VerificationTimer2 = null;
+          runStage2Verification();
+        }
+      };
 
-            msg.style.color = 'var(--success-color)';
-            msg.textContent = '検証完了';
-
-            setTimeout(() => {
-              s2Processing = false;
-              showClearScreen();
-            }, 800);
-          } else {
-            s2Processing = false;
-            if (returnBtn) returnBtn.disabled = false;
-            msg.style.color = 'var(--error-color)';
-
-            // 手動ドラッグされていない場合はスピナーを削除
-            if (draggedItems.spinner && !spinnerTouched) {
-              if (draggedItems.spinner.parentNode) {
-                draggedItems.spinner.parentNode.removeChild(draggedItems.spinner);
-              }
-              draggedItems.spinner = null;
-            }
-
-            if (hasRobot && !hasHuman) {
-              msg.textContent = '組織の脅威調査員ではないことを認証できません';
-            } else if (!hasRobot && hasHuman) {
-              msg.textContent = '悪意のある利用者ではないことを認証できません';
-            } else {
-              msg.textContent = '選択してください';
-            }
-
-            // 4秒後にエラーメッセージを自動消去
-            s2ErrorTimer = setTimeout(() => {
-              if (
-                msg.textContent === '検閲者ではないことを認証できません' ||
-                msg.textContent === 'ロボットではないことを認証できません' ||
-                msg.textContent === '選択してください'
-              ) {
-                msg.textContent = '';
-              }
-            }, 4000);
-          }
-        }, 1200);
-      }, 1200);
+      // 段階1: 「私は悪意のある利用者ではありません」の検証
+      s2VerificationTimer1 = setTimeout(() => {
+        s2VerificationTimer1 = null;
+        runStage1Verification();
+      }, s2VerificationFastMode ? 40 : 1200);
     }
 
-    function showClearScreen() {
+    function showClearScreen {
       document.getElementById('stage2').classList.add('hidden');
       document.getElementById('stageClear').classList.remove('hidden');
 
@@ -1320,6 +1357,10 @@
       s2Selected = null;
       s2Processing = false;
       s2ExternalChecked = { robot: false, human: false };
+      if (s2VerificationTimer1) { clearTimeout(s2VerificationTimer1); s2VerificationTimer1 = null; }
+      if (s2VerificationTimer2) { clearTimeout(s2VerificationTimer2); s2VerificationTimer2 = null; }
+      s2VerificationFastMode = false;
+      window._s2FastVerify = null;
 
       // リスタート時は第2ステージの「１つ前の認証に戻る」ボタンを再び有効化
       const returnBtn = document.getElementById('returnStage1Btn');
