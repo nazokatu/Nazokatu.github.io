@@ -256,39 +256,6 @@
       z-index: 100;
     }
 
-    /* Analytics Dashboard Panel */
-    .stats-card {
-      margin-top: 14px;
-      background: #f1f3f4;
-      border-radius: 4px;
-      padding: 10px 12px;
-      font-size: 11px;
-      color: #444;
-      border: 1px solid #e0e0e0;
-    }
-
-    .stats-title {
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 4px;
-      text-align: center;
-    }
-
-    .stats-val {
-      font-size: 12px;
-      font-weight: bold;
-      color: var(--accent-color);
-    }
-
     /* Footer Branding Mock */
     .captcha-footer {
       display: flex;
@@ -369,129 +336,7 @@
     }
   </style>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'i-am-not-xx-app';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-    let db = null;
-    let auth = null;
-    let currentUser = null;
-    let hasRecordedVisit = false;
-
-    if (firebaseConfig) {
-      const app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
-
-      async function initAuthentication() {
-        try {
-          if (initialAuthToken) {
-            await signInWithCustomToken(auth, initialAuthToken);
-          } else {
-            await signInAnonymously(auth);
-          }
-        } catch (err) {
-          console.warn("Auth initialization fallback:", err);
-        }
-      }
-
-      onAuthStateChanged(auth, (user) => {
-        if (!user) return;
-        currentUser = user;
-        recordVisit();
-        listenToAnalytics();
-      });
-
-      initAuthentication();
-    }
-
-    async function recordVisit() {
-      if (!db || !currentUser || hasRecordedVisit) return;
-      hasRecordedVisit = true;
-      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
-
-      try {
-        const snap = await getDoc(statsRef);
-        if (!snap.exists()) {
-          await setDoc(statsRef, { visitCount: 1, clearCount: 0, redirectCount: 0, totalClearSeconds: 0 });
-        } else {
-          await updateDoc(statsRef, { visitCount: increment(1) });
-        }
-      } catch (err) {
-        console.error("Error recording visit:", err);
-      }
-    }
-
-    window.recordClearToDatabase = async function(elapsedSeconds) {
-      if (!db || !currentUser) return;
-      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
-
-      try {
-        const snap = await getDoc(statsRef);
-        if (!snap.exists()) {
-          await setDoc(statsRef, { visitCount: 1, clearCount: 1, redirectCount: 0, totalClearSeconds: elapsedSeconds });
-        } else {
-          await updateDoc(statsRef, {
-            clearCount: increment(1),
-            totalClearSeconds: increment(elapsedSeconds)
-          });
-        }
-      } catch (err) {
-        console.error("Error recording clear:", err);
-      }
-    };
-
-    window.recordRedirectToDatabase = async function() {
-      if (!db || !currentUser) return;
-      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
-
-      try {
-        const snap = await getDoc(statsRef);
-        if (!snap.exists()) {
-          await setDoc(statsRef, { visitCount: 1, clearCount: 0, redirectCount: 1, totalClearSeconds: 0 });
-        } else {
-          await updateDoc(statsRef, { redirectCount: increment(1) });
-        }
-      } catch (err) {
-        console.error("Error recording redirect:", err);
-      }
-    };
-
-    function listenToAnalytics() {
-      if (!db || !currentUser) return;
-      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'analytics', 'global');
-
-      onSnapshot(statsRef, (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          const visits = data.visitCount || 0;
-          const clears = data.clearCount || 0;
-          const redirects = data.redirectCount || 0;
-          const totalSec = data.totalClearSeconds || 0;
-          const avgSec = clears > 0 ? Math.round(totalSec / clears) : 0;
-
-          document.getElementById('statVisits').textContent = visits;
-          document.getElementById('statClears').textContent = clears;
-          document.getElementById('statRedirects').textContent = redirects;
-          document.getElementById('statAvgTime').textContent = formatSeconds(avgSec);
-        }
-      }, (err) => {
-        console.error("Analytics listener error:", err);
-      });
-    }
-
-    function formatSeconds(sec) {
-      if (!sec || sec <= 0) return '0秒';
-      const m = Math.floor(sec / 60);
-      const s = sec % 60;
-      return m > 0 ? `${m}分${s}秒` : `${s}秒`;
-    }
-  </script>
 </head>
 <body>
 
@@ -557,36 +402,6 @@
       </div>
 
       <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="navigateToTarget()">アクセスする</button>
-    </div>
-
-    <!-- Analytics Dashboard View -->
-    <div class="stats-card">
-      <div class="stats-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6" y1="20" x2="6" y2="14"></line>
-        </svg>
-        アクセス統計
-      </div>
-      <div class="stats-grid">
-        <div>
-          <div style="color:#777; font-size:10px;">アクセス数</div>
-          <div class="stats-val" id="statVisits">-</div>
-        </div>
-        <div>
-          <div style="color:#777; font-size:10px;">クリア数</div>
-          <div class="stats-val" id="statClears">-</div>
-        </div>
-        <div>
-          <div style="color:#777; font-size:10px;">遷移数</div>
-          <div class="stats-val" id="statRedirects">-</div>
-        </div>
-        <div>
-          <div style="color:#777; font-size:10px;">平均タイム</div>
-          <div class="stats-val" id="statAvgTime">-</div>
-        </div>
-      </div>
     </div>
 
     <!-- Footer -->
@@ -766,6 +581,8 @@
               }
               draggedItems.spinner = null;
             }
+            // 第1ステージで使い終わったスピナーなので、第2ステージの爆速判定を持ち越さない
+            spinnerTouched = false;
 
             // チェックマーク：ユーザーが移動させていなかった場合のみ消去
             if (draggedItems.check) {
@@ -1307,12 +1124,6 @@
         if (item) item.style.display = 'none';
       });
 
-      // Calculate elapsed time in seconds
-      const elapsedSeconds = Math.max(1, Math.floor((Date.now() - gameStartTime) / 1000));
-      if (window.recordClearToDatabase) {
-        window.recordClearToDatabase(elapsedSeconds);
-      }
-
       // Include Site URL in the X post template
       const currentUrl = window.location.href;
       const postTemplate = `【認証完了】\n\n「▢私は✕✕ではありません」\n\nこのポストの送信者は認証に成功しました\n\n✕✕✕✕へのアクセス、閲覧が可能になりました\n\n${currentUrl}`;
@@ -1328,9 +1139,6 @@
     function navigateToTarget() {
       const url = document.getElementById('redirectUrl').value;
       if (url) {
-        if (window.recordRedirectToDatabase) {
-          window.recordRedirectToDatabase();
-        }
         window.location.href = url;
       }
     }
