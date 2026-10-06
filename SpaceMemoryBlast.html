@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Memory Blast</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #020208;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        
+        .glass-panel {
+            background: rgba(10, 10, 25, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 119, 255, 0.2);
+        }
+
+        .neon-btn {
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.4), rgba(157, 78, 221, 0.4));
+            border: 1px solid rgba(0, 229, 255, 0.6);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+            cursor: pointer;
+        }
+
+        .neon-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(0, 229, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.5);
+            border-color: #00f0ff;
+        }
+
+        .neon-btn:active {
+            transform: translateY(1px);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.8), 0 0 20px rgba(157, 78, 221, 0.6);
+        }
+
+        .toggle-btn-active {
+            background: linear-gradient(135deg, #00f0ff, #7000ff) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
+            border-color: #ffffff !important;
+        }
+
+        #gameContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 画面シェイク用のアニメーション */
+        .shake-effect {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-4px, -2px, 0); }
+            20%, 80% { transform: translate3d(8px, 4px, 0); }
+            30%, 50%, 70% { transform: translate3d(-10px, -8px, 0); }
+            40%, 60% { transform: translate3d(10px, 8px, 0); }
+        }
+
+        /* 赤フラッシュ用オーバーレイ */
+        #flashOverlay {
+            position: absolute;
+            inset: 0;
+            background-color: rgba(255, 0, 50, 0.55);
+            pointer-events: none;
+            z-index: 25;
+            opacity: 0;
+            transition: opacity 0.1s ease-out;
+        }
+
+        #gameCanvas, #bgCanvas, #fxCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #bgCanvas { z-index: 1; pointer-events: none; }
+        #gameCanvas { z-index: 10; cursor: pointer; }
+        #fxCanvas { z-index: 20; pointer-events: none; }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            height: 8px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 22px;
+            width: 22px;
+            border-radius: 50%;
+            background: #00f0ff;
+            box-shadow: 0 0 10px #00f0ff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex items-center justify-center overflow-hidden">
+
+    <div id="gameContainer">
+        <!-- Canvas Layer -->
+        <canvas id="bgCanvas"></canvas>
+        <canvas id="gameCanvas"></canvas>
+        <canvas id="fxCanvas"></canvas>
+        <div id="flashOverlay"></div>
+    </div>
+
+    <!-- UI Overlay Layer -->
+    <div id="uiContainer" class="relative z-30 w-full h-full flex flex-col justify-between pointer-events-none p-4 md:p-6">
+        
+        <!-- Header HUD -->
+        <div id="hud" class="w-full flex justify-between items-center transition-opacity duration-500 opacity-0 pointer-events-auto">
+            <div class="glass-panel px-4 py-2 rounded-xl flex items-center space-x-3">
+                <i class="fa-solid fa-layer-group text-cyan-400"></i>
+                <span class="text-sm md:text-base font-orbitron tracking-wider">REMAINING: <span id="remainingCount" class="text-xl font-bold text-cyan-300">0</span></span>
+            </div>
+            <div class="glass-panel px-4 py-2 rounded-xl flex items-center space-x-3">
+                <span id="statusText" class="text-sm md:text-base font-bold text-yellow-400 animate-pulse tracking-wide">MEMORIZE THE ORDER!</span>
+            </div>
+        </div>
+
+        <!-- Start / Settings Screen Overlay -->
+        <div id="startMenu" class="absolute inset-0 m-auto w-full max-w-lg h-fit glass-panel rounded-3xl p-6 md:p-8 flex flex-col items-center justify-center pointer-events-auto shadow-2xl transition-all duration-500 my-auto overflow-y-auto max-h-[95vh]">
+            <div class="text-center mb-5">
+                <h1 class="text-3xl md:text-5xl font-black font-orbitron tracking-widest glow-text bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500">
+                    SPACE MEMORY BLAST
+                </h1>
+                <p class="text-xs md:text-sm text-cyan-200 mt-2 font-light tracking-widest">記憶の閃光を巡る宇宙パズルゲーム</p>
+            </div>
+
+            <!-- Settings Options -->
+            <div class="w-full space-y-4 mb-6 text-sm">
+                
+                <!-- Sphere Count Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-bold text-cyan-300 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-dot"></i> 球体の数
+                        </label>
+                        <span id="sphereCountValue" class="font-orbitron text-xl font-bold text-yellow-400">6</span>
+                    </div>
+                    <input type="range" id="sphereCountSlider" min="6" max="15" value="6" class="w-full cursor-pointer">
+                    <div class="flex justify-between text-xs text-gray-400 px-1 mt-1 font-orbitron">
+                        <span>6</span><span>9</span><span>12</span><span>15</span>
+                    </div>
+                </div>
+
+                <!-- Motion Mode Toggle -->
+                <div>
+                    <label class="block font-bold text-cyan-300 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-up-down-left-right"></i> 動作モード
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="modeMovingBtn" class="toggle-btn-active py-2 px-3 rounded-xl border border-cyan-500/30 transition-all font-bold text-center cursor-pointer">
+                            浮遊
+                        </button>
+                        <button id="modeStaticBtn" class="bg-slate-800/60 text-gray-300 py-2 px-3 rounded-xl border border-cyan-500/20 transition-all font-bold text-center cursor-pointer">
+                            静止
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Color Mode Toggle -->
+                <div>
+                    <label class="block font-bold text-cyan-300 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-palette"></i> カラーモード
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="colorMultiBtn" class="toggle-btn-active py-2 px-3 rounded-xl border border-cyan-500/30 transition-all font-bold text-center cursor-pointer">
+                            マルチカラー
+                        </button>
+                        <button id="colorMonoBtn" class="bg-slate-800/60 text-gray-300 py-2 px-3 rounded-xl border border-cyan-500/20 transition-all font-bold text-center cursor-pointer">
+                            単色
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 戦績表示エリア -->
+                <div class="w-full bg-slate-900/80 rounded-2xl p-3.5 border border-cyan-500/30 space-y-2">
+                    <div class="text-xs font-bold text-cyan-400 border-b border-cyan-500/20 pb-1 flex items-center justify-between">
+                        <span><i class="fa-solid fa-chart-line mr-1"></i> 選択中モードの記録</span>
+                        <span id="currentModeLabel" class="text-gray-300 font-normal">6個 / 浮遊 / マルチ</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-800/50 p-2 rounded-lg text-center border border-white/5">
+                            <span class="block text-gray-400 text-[10px]">あなたの戦績</span>
+                            <span id="userStatsSetting" class="font-orbitron font-bold text-cyan-300 text-sm">0 / 0</span>
+                            <span id="userRateSetting" class="block text-[10px] text-gray-400">(0%)</span>
+                        </div>
+                        <div class="bg-slate-800/50 p-2 rounded-lg text-center border border-white/5">
+                            <span class="block text-gray-400 text-[10px]">みんなの戦績</span>
+                            <span id="globalStatsSetting" class="font-orbitron font-bold text-purple-300 text-sm">0 / 0</span>
+                            <span id="globalRateSetting" class="block text-[10px] text-gray-400">(0%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Button -->
+            <button id="startBtn" class="neon-btn w-full py-4 rounded-2xl font-orbitron text-xl font-black tracking-widest text-white transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3">
+                <i class="fa-solid fa-play"></i> START MISSION
+            </button>
+        </div>
+
+        <!-- Result Screen Overlay -->
+        <div id="resultModal" class="hidden absolute inset-0 m-auto w-full max-w-md h-fit glass-panel rounded-3xl p-6 md:p-8 flex flex-col items-center justify-center pointer-events-auto text-center shadow-2xl transition-all duration-500 my-auto z-50">
+            <div id="resultHeaderIcon" class="text-6xl mb-3"></div>
+            <h2 id="resultTitle" class="text-3xl md:text-4xl font-black font-orbitron mb-2 tracking-wider"></h2>
+            <p id="resultDesc" class="text-sm text-gray-300 mb-6"></p>
+
+            <!-- Result Details & Stats Box -->
+            <div class="w-full bg-slate-900/60 rounded-2xl p-4 mb-6 text-xs md:text-sm border border-white/10 space-y-3 text-left">
+                <div class="space-y-1.5 border-b border-white/10 pb-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">球体の数:</span>
+                        <span id="resSphereCount" class="font-bold text-cyan-300">6個</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">動作モード:</span>
+                        <span id="resMotionMode" class="font-bold text-cyan-300">浮遊</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">カラーモード:</span>
+                        <span id="resColorMode" class="font-bold text-cyan-300">マルチカラー</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div class="bg-slate-800/80 p-2 rounded-xl text-center border border-cyan-500/20">
+                        <span class="block text-gray-400 text-[10px]">あなたの戦績</span>
+                        <span id="userStatsResult" class="font-orbitron font-bold text-cyan-300 text-sm">0 / 0</span>
+                        <span id="userRateResult" class="block text-[10px] text-gray-400">(クリア率 0%)</span>
+                    </div>
+                    <div class="bg-slate-800/80 p-2 rounded-xl text-center border border-purple-500/20">
+                        <span class="block text-gray-400 text-[10px]">みんなの戦績</span>
+                        <span id="globalStatsResult" class="font-orbitron font-bold text-purple-300 text-sm">0 / 0</span>
+                        <span id="globalRateResult" class="block text-[10px] text-gray-400">(クリア率 0%)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="w-full space-y-3">
+                <button id="restartBtn" class="neon-btn w-full py-3.5 rounded-xl font-orbitron font-bold text-lg text-white flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> AGAIN
+                </button>
+                <button id="changeModeBtn" class="w-full py-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/20 font-orbitron text-sm text-gray-300 transition-all cursor-pointer">
+                    <i class="fa-solid fa-gear"></i> CHANGE SETTINGS
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ゲームエンジン＆完全ロジック -->
+    <script>
+        // --- 設定＆データ管理 ---
+        let settings = { count: 6, motion: 'moving', color: 'multi' };
+
+        function getModeKey() {
+            return `smb_stats_${settings.count}_${settings.motion}_${settings.color}`;
+        }
+
+        function getUserStats() {
+            const data = localStorage.getItem(getModeKey());
+            return data ? JSON.parse(data) : { cleared: 0, total: 0 };
+        }
+
+        function recordGameResult(isClear) {
+            const stats = getUserStats();
+            stats.total += 1;
+            if (isClear) stats.cleared += 1;
+            localStorage.setItem(getModeKey(), JSON.stringify(stats));
+        }
+
+        function getGlobalStats() {
+            return { cleared: 0, total: 0 };
+        }
+
+        function updateStatsUI() {
+            const uStats = getUserStats();
+            const gStats = getGlobalStats();
+
+            const uRate = uStats.total > 0 ? Math.round((uStats.cleared / uStats.total) * 100) : 0;
+            const gRate = gStats.total > 0 ? Math.round((gStats.cleared / gStats.total) * 100) : 0;
+
+            const modeLabel = `${settings.count}個 / ${settings.motion === 'moving' ? '浮遊' : '静止'} / ${settings.color === 'multi' ? 'マルチ' : '単色'}`;
+
+            document.getElementById('currentModeLabel').textContent = modeLabel;
+            document.getElementById('userStatsSetting').textContent = `${uStats.cleared} / ${uStats.total}`;
+            document.getElementById('userRateSetting').textContent = `(${uRate}%)`;
+            document.getElementById('globalStatsSetting').textContent = `${gStats.cleared} / ${gStats.total}`;
+            document.getElementById('globalRateSetting').textContent = `(${gRate}%)`;
+
+            document.getElementById('userStatsResult').textContent = `${uStats.cleared} / ${uStats.total}`;
+            document.getElementById('userRateResult').textContent = `(クリア率 ${uRate}%)`;
+            document.getElementById('globalStatsResult').textContent = `${gStats.cleared} / ${gStats.total}`;
+            document.getElementById('globalRateResult').textContent = `(クリア率 ${gRate}%)`;
+        }
+
+        // --- UIイベント設定 ---
+        const slider = document.getElementById('sphereCountSlider');
+        const countVal = document.getElementById('sphereCountValue');
+        slider.addEventListener('input', (e) => {
+            settings.count = parseInt(e.target.value);
+            countVal.textContent = settings.count;
+            updateStatsUI();
+        });
+
+        const setupToggle = (btn1, btn2, key, val1, val2) => {
+            const handleToggle = (btnActive, btnInactive, val) => {
+                btnActive.classList.add('toggle-btn-active');
+                btnActive.classList.remove('bg-slate-800/60', 'text-gray-300');
+                btnInactive.classList.remove('toggle-btn-active');
+                btnInactive.classList.add('bg-slate-800/60', 'text-gray-300');
+                settings[key] = val;
+                updateStatsUI();
+            };
+            btn1.addEventListener('click', () => handleToggle(btn1, btn2, val1));
+            btn2.addEventListener('click', () => handleToggle(btn2, btn1, val2));
+        };
+
+        setupToggle(document.getElementById('modeMovingBtn'), document.getElementById('modeStaticBtn'), 'motion', 'moving', 'static');
+        setupToggle(document.getElementById('colorMultiBtn'), document.getElementById('colorMonoBtn'), 'color', 'multi', 'mono');
+
+        document.getElementById('changeModeBtn').addEventListener('click', () => {
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('startMenu').classList.remove('hidden');
+            document.getElementById('hud').classList.add('opacity-0');
+            gameState = 'MENU';
+            updateStatsUI();
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        // --- Canvas & ゲームシステム ---
+        const gameContainer = document.getElementById('gameContainer');
+        const flashOverlay = document.getElementById('flashOverlay');
+        const bgCanvas = document.getElementById('bgCanvas');
+        const gameCanvas = document.getElementById('gameCanvas');
+        const fxCanvas = document.getElementById('fxCanvas');
+
+        const bgCtx = bgCanvas.getContext('2d');
+        const ctx = gameCanvas.getContext('2d');
+        const fxCtx = fxCanvas.getContext('2d');
+
+        let width, height;
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            bgCanvas.width = gameCanvas.width = fxCanvas.width = width;
+            bgCanvas.height = gameCanvas.height = fxCanvas.height = height;
+            initBackground();
+        }
+        window.addEventListener('resize', resize);
+
+        // --- 宇宙背景描画 ---
+        let stars = [];
+        let nebulae = [];
+
+        function initBackground() {
+            stars = [];
+            nebulae = [];
+
+            for(let i = 0; i < 250; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2.2 + 0.3,
+                    alpha: Math.random() * 0.8 + 0.2,
+                    color: Math.random() > 0.8 ? (Math.random() > 0.5 ? '#9bb0ff' : '#ffcc6f') : '#ffffff',
+                    twinkleSpeed: Math.random() * 0.02 + 0.005
+                });
+            }
+
+            const nebulaColors = [
+                { r: 75, g: 0, b: 130 },
+                { r: 0, g: 100, b: 200 },
+                { r: 180, g: 0, b: 120 }
+            ];
+
+            for (let i = 0; i < 4; i++) {
+                const color = nebulaColors[i % nebulaColors.length];
+                nebulae.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: Math.random() * 250 + 200,
+                    color: color
+                });
+            }
+        }
+
+        function drawBackground() {
+            bgCtx.fillStyle = '#02020a';
+            bgCtx.fillRect(0, 0, width, height);
+
+            nebulae.forEach(n => {
+                let grad = bgCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
+                grad.addColorStop(0, `rgba(${n.color.r}, ${n.color.g}, ${n.color.b}, 0.18)`);
+                grad.addColorStop(0.5, `rgba(${n.color.r}, ${n.color.g}, ${n.color.b}, 0.05)`);
+                grad.addColorStop(1, 'transparent');
+                bgCtx.fillStyle = grad;
+                bgCtx.beginPath();
+                bgCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+                bgCtx.fill();
+            });
+
+            stars.forEach(s => {
+                s.alpha += Math.sin(Date.now() * s.twinkleSpeed) * 0.01;
+                let clampAlpha = Math.max(0.1, Math.min(1, s.alpha));
+
+                bgCtx.fillStyle = s.color;
+                bgCtx.globalAlpha = clampAlpha;
+                bgCtx.beginPath();
+                bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                bgCtx.fill();
+            });
+            bgCtx.globalAlpha = 1.0;
+        }
+
+        // --- カラーパレット自動生成（色相環を均等分割して重複・近似を防止） ---
+        function generateColors(count) {
+            const colors = [];
+            // ランダムな初期オフセットを持たせることで毎回異なる配色に
+            const offset = Math.floor(Math.random() * 360);
+            
+            for (let i = 0; i < count; i++) {
+                // 360度を個数で均等分割（さらに隣り合う色が似過ぎないようゴールデンレシオ風に分散）
+                const hue = (offset + (i * (360 / count))) % 360;
+                // 鮮やかで視認性の高い発色のHSLカラー
+                colors.push(`hsl(${Math.round(hue)}, 100%, 60%)`);
+            }
+            // 配列をシャッフルして配置位置の色の偏りを防止
+            for (let i = colors.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [colors[i], colors[j]] = [colors[j], colors[i]];
+            }
+            return colors;
+        }
+
+        const monoColor = '#00f0ff';
+
+        // ゲーム状態
+        let spheres = [];
+        let sequence = [];
+        let userStep = 0;
+        let gameState = 'MENU';
+        let particles = [];
+        let shockwaves = [];
+
+        class Sphere {
+            constructor(id, x, y, radius, color) {
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.baseRadius = radius;
+                this.radius = radius;
+                this.color = color;
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = (Math.random() - 0.5) * 1.5;
+                this.highlight = false;
+                this.highlightColor = '#ffffff';
+                this.destroyed = false;
+                this.isShrinking = false; // 収縮中フラグ
+            }
+
+            update() {
+                // 正解タップ時の収縮アニメーション処理
+                if (this.isShrinking) {
+                    this.radius *= 0.82; // スムーズにキュッと小さくなる
+                    if (this.radius < 1.5) {
+                        this.destroyed = true;
+                        this.isShrinking = false;
+                        // 収縮しきったタイミングで優しめのふわっと広がるパーティクル生成
+                        createSoftParticles(this.x, this.y, this.color);
+                    }
+                    return;
+                }
+
+                if (settings.motion === 'moving' && !this.destroyed) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    const padding = this.baseRadius + 60;
+                    if (this.x < padding || this.x > width - padding) this.vx *= -1;
+                    if (this.y < padding + 60 || this.y > height - padding) this.vy *= -1;
+                }
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
+                
+                let grad = ctx.createRadialGradient(
+                    this.x - this.radius * 0.35, this.y - this.radius * 0.35, Math.max(0.1, this.radius * 0.05),
+                    this.x, this.y, Math.max(0.1, this.radius)
+                );
+
+                if (this.highlight) {
+                    grad.addColorStop(0, '#ffffff');
+                    grad.addColorStop(0.3, this.highlightColor);
+                    grad.addColorStop(1, '#050515');
+                    ctx.shadowColor = this.highlightColor;
+                    ctx.shadowBlur = 35;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2.5;
+                } else {
+                    grad.addColorStop(0, '#999999');
+                    grad.addColorStop(0.3, '#444444');
+                    grad.addColorStop(0.85, '#1a1a24');
+                    grad.addColorStop(1, '#08080d');
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 10;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+                    ctx.lineWidth = 1.5;
+                }
+
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // ゲーム開始
+        function startGame() {
+            document.getElementById('startMenu').classList.add('hidden');
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('hud').classList.remove('opacity-0');
+
+            spheres = [];
+            sequence = [];
+            userStep = 0;
+            particles = [];
+            shockwaves = [];
+
+            // 個数に応じたカラーリストの生成（マルチカラー時）
+            const generatedColors = generateColors(settings.count);
+
+            const radius = Math.min(width, height) < 600 ? 22 : 28;
+            const margin = radius * 2.8;
+
+            for (let i = 0; i < settings.count; i++) {
+                let x, y, overlap;
+                let attempts = 0;
+                do {
+                    overlap = false;
+                    x = margin + Math.random() * (width - margin * 2);
+                    y = margin + 80 + Math.random() * (height - margin * 2 - 80);
+
+                    for (let s of spheres) {
+                        const dist = Math.hypot(s.x - x, s.y - y);
+                        if (dist < radius * 2.3) {
+                            overlap = true;
+                            break;
+                        }
+                    }
+                    attempts++;
+                } while (overlap && attempts < 300);
+
+                const color = settings.color === 'multi' ? generatedColors[i] : monoColor;
+                spheres.push(new Sphere(i, x, y, radius, color));
+            }
+
+            let indices = Array.from({length: settings.count}, (_, i) => i);
+            while(indices.length > 0) {
+                const randIndex = Math.floor(Math.random() * indices.length);
+                sequence.push(indices.splice(randIndex, 1)[0]);
+            }
+
+            document.getElementById('remainingCount').textContent = settings.count;
+            playMemorizeSequence();
+        }
+
+        // 記憶シーケンス（1秒おきに1つずつ点灯）
+        async function playMemorizeSequence() {
+            gameState = 'MEMORIZE';
+            const statusText = document.getElementById('statusText');
+            statusText.textContent = 'MEMORIZE THE ORDER!';
+            statusText.className = 'text-sm md:text-base font-bold text-yellow-400 animate-pulse tracking-wide';
+
+            await new Promise(r => setTimeout(r, 600));
+
+            for (let i = 0; i < sequence.length; i++) {
+                if (gameState !== 'MEMORIZE') return;
+                const sphere = spheres[sequence[i]];
+                sphere.highlight = true;
+                sphere.highlightColor = sphere.color;
+                
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            await new Promise(r => setTimeout(r, 800));
+
+            // 一斉にすべての球体を消灯！
+            spheres.forEach(s => s.highlight = false);
+
+            await new Promise(r => setTimeout(r, 300));
+
+            // プレイヤーの操作フェーズへ
+            gameState = 'PLAYING';
+            statusText.textContent = 'TOUCH IN ORDER!';
+            statusText.className = 'text-sm md:text-base font-bold text-cyan-300 animate-bounce tracking-wide';
+        }
+
+        // 正解時の「やさしめのパーティクル」演出
+        function createSoftParticles(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 2.5 + 0.8; // ゆっくり優しく広がる
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 2.5 + 1.2,
+                    color: color,
+                    alpha: 0.9,
+                    life: 0.94 + Math.random() * 0.03
+                });
+            }
+        }
+
+        // ミス時の激しい爆発パーティクル
+        function createExplosion(x, y, color, count = 35) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 8 + 2;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 4 + 1.5,
+                    color: color,
+                    alpha: 1,
+                    life: 0.93 + Math.random() * 0.04
+                });
+            }
+        }
+
+        function createShockwave(x, y, maxRadius = 250, color = 'rgba(255, 0, 85, 0.8)') {
+            shockwaves.push({
+                x, y,
+                radius: 10,
+                maxRadius: maxRadius,
+                alpha: 1,
+                color: color,
+                lineWidth: 12
+            });
+        }
+
+        function updateFX() {
+            fxCtx.clearRect(0, 0, width, height);
+
+            // パーティクルの更新＆描画
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha *= p.life;
+
+                fxCtx.save();
+                fxCtx.globalAlpha = p.alpha;
+                fxCtx.fillStyle = p.color;
+                fxCtx.beginPath();
+                fxCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                fxCtx.fill();
+                fxCtx.restore();
+
+                if (p.alpha < 0.02) particles.splice(i, 1);
+            }
+
+            // ショックウェーブの更新＆描画
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                let sw = shockwaves[i];
+                sw.radius += (sw.maxRadius - sw.radius) * 0.15 + 2;
+                sw.alpha *= 0.92;
+                sw.lineWidth *= 0.95;
+
+                fxCtx.save();
+                fxCtx.globalAlpha = sw.alpha;
+                fxCtx.strokeStyle = sw.color;
+                fxCtx.lineWidth = sw.lineWidth;
+                fxCtx.beginPath();
+                fxCtx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+                fxCtx.stroke();
+                fxCtx.restore();
+
+                if (sw.alpha < 0.02 || sw.lineWidth < 0.5) shockwaves.splice(i, 1);
+            }
+        }
+
+        // タップ/クリック判定
+        function handleInput(e) {
+            if (gameState !== 'PLAYING') return;
+
+            const rect = gameCanvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            const touchX = clientX - rect.left;
+            const touchY = clientY - rect.top;
+
+            for (let sphere of spheres) {
+                if (sphere.destroyed || sphere.isShrinking) continue;
+
+                const dist = Math.hypot(sphere.x - touchX, sphere.y - touchY);
+                if (dist <= sphere.radius + 15) {
+                    const targetIndex = sequence[userStep];
+
+                    if (sphere.id === targetIndex) {
+                        // 正解！【点灯 → 収縮 → やさしめのパーティクル】
+                        sphere.highlight = true; // パッと点灯
+                        sphere.highlightColor = sphere.color;
+                        sphere.isShrinking = true; // 収縮開始
+
+                        userStep++;
+                        document.getElementById('remainingCount').textContent = settings.count - userStep;
+
+                        if (userStep >= settings.count) {
+                            endGame(true);
+                        }
+                    } else {
+                        // 不正解！（派手なゲームオーバー演出を開始）
+                        trigger派手GameoverEffect(touchX, touchY);
+                        endGame(false);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 派手なゲームオーバー演出処理
+        function trigger派手GameoverEffect(failX, failY) {
+            // 1. 画面全体の激しい振動（シェイク）
+            gameContainer.classList.remove('shake-effect');
+            void gameContainer.offsetWidth; // リフロー発生
+            gameContainer.classList.add('shake-effect');
+
+            // 2. 画面赤フラッシュ
+            flashOverlay.style.opacity = '1';
+            setTimeout(() => {
+                flashOverlay.style.opacity = '0';
+            }, 250);
+
+            // 3. ミス箇所からの赤い連続衝撃波
+            createShockwave(failX, failY, Math.max(width, height) * 0.8, '#ff0055');
+            setTimeout(() => createShockwave(failX, failY, Math.max(width, height) * 0.5, '#ff5500'), 100);
+
+            // 4. 残っている球体が連鎖爆発して消滅
+            spheres.forEach((s, idx) => {
+                if (!s.destroyed) {
+                    setTimeout(() => {
+                        s.destroyed = true;
+                        s.isShrinking = false;
+                        createExplosion(s.x, s.y, '#ff0055', 45);
+                        createShockwave(s.x, s.y, 80, 'rgba(255,0,85,0.6)');
+                    }, idx * 60);
+                }
+            });
+        }
+
+        gameCanvas.addEventListener('pointerdown', handleInput);
+
+        // ゲーム終了処理
+        function endGame(isClear) {
+            gameState = 'RESULT';
+            recordGameResult(isClear);
+            updateStatsUI();
+
+            document.getElementById('resSphereCount').textContent = `${settings.count}個`;
+            document.getElementById('resMotionMode').textContent = settings.motion === 'moving' ? '浮遊' : '静止';
+            document.getElementById('resColorMode').textContent = settings.color === 'multi' ? 'マルチカラー' : '単色';
+
+            const modal = document.getElementById('resultModal');
+            const icon = document.getElementById('resultHeaderIcon');
+            const title = document.getElementById('resultTitle');
+            const desc = document.getElementById('resultDesc');
+
+            if (isClear) {
+                icon.innerHTML = '🏆';
+                title.textContent = 'MISSION CLEAR!';
+                title.className = 'text-3xl md:text-4xl font-black font-orbitron mb-2 tracking-wider text-yellow-400 glow-text-gold';
+                desc.textContent = '素晴らしい記憶力です！宇宙の記憶を完璧に同期しました。';
+            } else {
+                icon.innerHTML = '💥';
+                title.textContent = 'MISSION FAILED';
+                title.className = 'text-3xl md:text-4xl font-black font-orbitron mb-2 tracking-wider text-red-500';
+                desc.textContent = 'シーケンスの不一致を検知！記憶が断絶しました。';
+            }
+
+            const delay = isClear ? 600 : 900;
+            setTimeout(() => {
+                modal.classList.remove('hidden');
+            }, delay);
+        }
+
+        // メインゲームループ
+        function gameLoop() {
+            drawBackground();
+            ctx.clearRect(0, 0, width, height);
+
+            spheres.forEach(s => {
+                s.update();
+                s.draw();
+            });
+
+            updateFX();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 初期化実行
+        resize();
+        updateStatsUI();
+        gameLoop();
+    </script>
+</body>
+</html>
