@@ -282,6 +282,139 @@
 
     <!-- ゲームエンジン＆完全ロジック -->
     <script>
+        // --- Web Audio API による効果音（SE）合成生成エンジン ---
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            // ボタンタップ音
+            playBtnClick() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            }
+
+            // 記憶タイムの球体点灯音（ステップに応じて音が少し高くなる）
+            playLightUp(step = 0) {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const baseFreq = 440; // A4
+                const freq = baseFreq * Math.pow(2, (step % 12) / 12); // 音階アップ効果
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.4);
+            }
+
+            // 正解タップ音（キラリと明るい短い和音）
+            playCorrect() {
+                this.init();
+                const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5
+                freqs.forEach((f, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(f, this.ctx.currentTime + idx * 0.03);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.03 + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.03);
+                    osc.stop(this.ctx.currentTime + idx * 0.03 + 0.25);
+                });
+            }
+
+            // 不正解・ゲームオーバー音（重低音ショック）
+            playWrong() {
+                this.init();
+                // 低音ソーチュース
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.6);
+                gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.6);
+
+                // ノイズ爆発成分
+                const bufferSize = this.ctx.sampleRate * 0.4;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+                noise.connect(noiseGain);
+                noiseGain.connect(this.ctx.destination);
+                noise.start();
+            }
+
+            // ゲームスタート音
+            playStart() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.35);
+            }
+
+            // ミッションクリアファンファーレ
+            playClear() {
+                this.init();
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C, E, G, C(hi)
+                notes.forEach((f, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, this.ctx.currentTime + idx * 0.1);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.4);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.1);
+                    osc.stop(this.ctx.currentTime + idx * 0.1 + 0.4);
+                });
+            }
+        }
+
+        const sfx = new SoundEffects();
+
         // --- 設定＆データ管理 ---
         let settings = { count: 6, motion: 'moving', color: 'multi' };
 
@@ -332,11 +465,13 @@
         slider.addEventListener('input', (e) => {
             settings.count = parseInt(e.target.value);
             countVal.textContent = settings.count;
+            sfx.playBtnClick();
             updateStatsUI();
         });
 
         const setupToggle = (btn1, btn2, key, val1, val2) => {
             const handleToggle = (btnActive, btnInactive, val) => {
+                sfx.playBtnClick();
                 btnActive.classList.add('toggle-btn-active');
                 btnActive.classList.remove('bg-slate-800/60', 'text-gray-300');
                 btnInactive.classList.remove('toggle-btn-active');
@@ -352,6 +487,7 @@
         setupToggle(document.getElementById('colorMultiBtn'), document.getElementById('colorMonoBtn'), 'color', 'multi', 'mono');
 
         document.getElementById('changeModeBtn').addEventListener('click', () => {
+            sfx.playBtnClick();
             document.getElementById('resultModal').classList.add('hidden');
             document.getElementById('startMenu').classList.remove('hidden');
             document.getElementById('hud').classList.add('opacity-0');
@@ -447,19 +583,15 @@
             bgCtx.globalAlpha = 1.0;
         }
 
-        // --- カラーパレット自動生成（色相環を均等分割して重複・近似を防止） ---
+        // --- カラーパレット自動生成 ---
         function generateColors(count) {
             const colors = [];
-            // ランダムな初期オフセットを持たせることで毎回異なる配色に
             const offset = Math.floor(Math.random() * 360);
             
             for (let i = 0; i < count; i++) {
-                // 360度を個数で均等分割（さらに隣り合う色が似過ぎないようゴールデンレシオ風に分散）
                 const hue = (offset + (i * (360 / count))) % 360;
-                // 鮮やかで視認性の高い発色のHSLカラー
                 colors.push(`hsl(${Math.round(hue)}, 100%, 60%)`);
             }
-            // 配列をシャッフルして配置位置の色の偏りを防止
             for (let i = colors.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [colors[i], colors[j]] = [colors[j], colors[i]];
@@ -490,17 +622,15 @@
                 this.highlight = false;
                 this.highlightColor = '#ffffff';
                 this.destroyed = false;
-                this.isShrinking = false; // 収縮中フラグ
+                this.isShrinking = false;
             }
 
             update() {
-                // 正解タップ時の収縮アニメーション処理
                 if (this.isShrinking) {
-                    this.radius *= 0.82; // スムーズにキュッと小さくなる
+                    this.radius *= 0.82;
                     if (this.radius < 1.5) {
                         this.destroyed = true;
                         this.isShrinking = false;
-                        // 収縮しきったタイミングで優しめのふわっと広がるパーティクル生成
                         createSoftParticles(this.x, this.y, this.color);
                     }
                     return;
@@ -556,6 +686,7 @@
 
         // ゲーム開始
         function startGame() {
+            sfx.playStart();
             document.getElementById('startMenu').classList.add('hidden');
             document.getElementById('resultModal').classList.add('hidden');
             document.getElementById('hud').classList.remove('opacity-0');
@@ -566,9 +697,7 @@
             particles = [];
             shockwaves = [];
 
-            // 個数に応じたカラーリストの生成（マルチカラー時）
             const generatedColors = generateColors(settings.count);
-
             const radius = Math.min(width, height) < 600 ? 22 : 28;
             const margin = radius * 2.8;
 
@@ -604,7 +733,7 @@
             playMemorizeSequence();
         }
 
-        // 記憶シーケンス（1秒おきに1つずつ点灯）
+        // 記憶シーケンス（1秒おきに1つずつ点灯＆SE再生）
         async function playMemorizeSequence() {
             gameState = 'MEMORIZE';
             const statusText = document.getElementById('statusText');
@@ -619,6 +748,8 @@
                 sphere.highlight = true;
                 sphere.highlightColor = sphere.color;
                 
+                sfx.playLightUp(i); // 点灯音をならす
+
                 await new Promise(r => setTimeout(r, 1000));
             }
 
@@ -639,7 +770,7 @@
         function createSoftParticles(x, y, color) {
             for (let i = 0; i < 20; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 2.5 + 0.8; // ゆっくり優しく広がる
+                const speed = Math.random() * 2.5 + 0.8;
                 particles.push({
                     x, y,
                     vx: Math.cos(angle) * speed,
@@ -652,7 +783,7 @@
             }
         }
 
-        // ミス時の激しい爆発パーティクル
+        // ミス時の爆発パーティクル
         function createExplosion(x, y, color, count = 35) {
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
@@ -683,7 +814,6 @@
         function updateFX() {
             fxCtx.clearRect(0, 0, width, height);
 
-            // パーティクルの更新＆描画
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
                 p.x += p.vx;
@@ -701,7 +831,6 @@
                 if (p.alpha < 0.02) particles.splice(i, 1);
             }
 
-            // ショックウェーブの更新＆描画
             for (let i = shockwaves.length - 1; i >= 0; i--) {
                 let sw = shockwaves[i];
                 sw.radius += (sw.maxRadius - sw.radius) * 0.15 + 2;
@@ -740,10 +869,11 @@
                     const targetIndex = sequence[userStep];
 
                     if (sphere.id === targetIndex) {
-                        // 正解！【点灯 → 収縮 → やさしめのパーティクル】
-                        sphere.highlight = true; // パッと点灯
+                        // 正解！【点灯 → 収縮 → やさしめのパーティクル ＋ 正解SE】
+                        sfx.playCorrect();
+                        sphere.highlight = true;
                         sphere.highlightColor = sphere.color;
-                        sphere.isShrinking = true; // 収縮開始
+                        sphere.isShrinking = true;
 
                         userStep++;
                         document.getElementById('remainingCount').textContent = settings.count - userStep;
@@ -752,7 +882,8 @@
                             endGame(true);
                         }
                     } else {
-                        // 不正解！（派手なゲームオーバー演出を開始）
+                        // 不正解！【重低音SE ＋ 派手演出】
+                        sfx.playWrong();
                         trigger派手GameoverEffect(touchX, touchY);
                         endGame(false);
                     }
@@ -763,22 +894,18 @@
 
         // 派手なゲームオーバー演出処理
         function trigger派手GameoverEffect(failX, failY) {
-            // 1. 画面全体の激しい振動（シェイク）
             gameContainer.classList.remove('shake-effect');
-            void gameContainer.offsetWidth; // リフロー発生
+            void gameContainer.offsetWidth;
             gameContainer.classList.add('shake-effect');
 
-            // 2. 画面赤フラッシュ
             flashOverlay.style.opacity = '1';
             setTimeout(() => {
                 flashOverlay.style.opacity = '0';
             }, 250);
 
-            // 3. ミス箇所からの赤い連続衝撃波
             createShockwave(failX, failY, Math.max(width, height) * 0.8, '#ff0055');
             setTimeout(() => createShockwave(failX, failY, Math.max(width, height) * 0.5, '#ff5500'), 100);
 
-            // 4. 残っている球体が連鎖爆発して消滅
             spheres.forEach((s, idx) => {
                 if (!s.destroyed) {
                     setTimeout(() => {
@@ -809,6 +936,7 @@
             const desc = document.getElementById('resultDesc');
 
             if (isClear) {
+                sfx.playClear(); // ファンファーレ音
                 icon.innerHTML = '🏆';
                 title.textContent = 'MISSION CLEAR!';
                 title.className = 'text-3xl md:text-4xl font-black font-orbitron mb-2 tracking-wider text-yellow-400 glow-text-gold';
