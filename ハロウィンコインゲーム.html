@@ -513,11 +513,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v20', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v22', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v20');
+      const saved = localStorage.getItem('halloween_game_state_v22');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -529,7 +529,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v20');
+      localStorage.removeItem('halloween_game_state_v22');
       location.reload();
     }
 
@@ -537,6 +537,14 @@
       if (confirm("本当にゲームをリセットして最初からやり直しますか？現在の進行データは削除されます。")) {
         resetGame();
       }
+    }
+
+    // プレイヤーの「箱の外のコイン数」を取得するヘルパー関数
+    function getOutsideCoins(pIdx) {
+      const p = gameState.players[pIdx];
+      const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
+      const betVal = betRec ? betRec.bet : 0;
+      return Math.max(0, p.coins - betVal);
     }
 
     // --- セットアップ ---
@@ -702,7 +710,6 @@
       closeModal();
       const p = gameState.players[pIdx];
 
-      // 所持コインが0枚の場合は自動的に借金モーダルへ誘導
       if (p.coins < 1) {
         alert(`${p.name} の所持コインが0枚です。先に借金を行ってください。`);
         openDebtModalText();
@@ -835,6 +842,12 @@
         return;
       }
 
+      // 【追加安全チェック】カード④の手がかり全公開済み事前判定（コスト消費前の完全ブロック）
+      if (cardNum === 4 && gameState.card4Index[pIdx] >= CLUES.length) {
+        alert(`すべての手がかり（全${CLUES.length}件）を確認済みのため、カード④は使用できません。\n（コインは消費されません）`);
+        return;
+      }
+
       closeModal();
       const p = gameState.players[pIdx];
 
@@ -843,17 +856,28 @@
       else if (cardNum === 3) cost = 2;
       else if (cardNum === 4) cost = 4;
 
-      if (p.coins < cost) {
-        alert(`所持コインが不足しています。（必要: ${cost}枚 / 所持: ${p.coins}枚）`);
+      // 箱の外のコイン数を算出
+      const outsideCoins = getOutsideCoins(pIdx);
+
+      // 箱の外のコインがコスト不足の場合 ➔ 完全使用不可（箱の中から補填不可）
+      if (outsideCoins < cost) {
+        alert(`カードを使用できません。\nカード使用コスト（${cost}枚）は箱の外のコインからのみ支払う必要があります。\n（現在の箱の外のコイン: ${outsideCoins}枚）\n※箱の中のコインから補填することはできません。`);
         return;
       }
+
+      const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
+      const currentBet = betRec ? betRec.bet : 0;
 
       let content = `
         <p style="color:var(--danger-color); font-weight:bold; font-size:0.85rem; margin-bottom:10px;">
           ※次の画面は ${p.name} 以外が見えないところで見てください
         </p>
         <div class="secret-box">
-          箱の外から <strong>${cost}枚</strong> 払っていただきます。<br>よろしいですか？
+          箱の外のコインから <strong>${cost}枚</strong> 払っていただきます。<br>
+          <span style="font-size:0.85rem; color:var(--text-muted);">
+            （支払い前 ➔ 箱の中: ${currentBet}枚 / 箱の外: ${outsideCoins}枚）<br>
+            （支払い後 ➔ 箱の中: ${currentBet}枚 / 箱の外: ${outsideCoins - cost}枚）
+          </span>
         </div>
         <button onclick="processCardUseWithText(${pIdx}, ${cardNum}, '${subType}')">はい（カード効果を表示）</button>
         <button class="secondary" onclick="closeModal()">キャンセル</button>
@@ -861,14 +885,15 @@
       showModal(`${p.name} - カード使用確認`, content);
     }
 
-    // 共通の賭け金変更UI（全カード対応・上下カウンター・下限1枚）
+    // 共通の賭け金変更UI（カード①用：コスト支払い後の状態を正しく維持）
     function buildCardBetChangeUI(pIdx) {
       const p = gameState.players[pIdx];
       let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
       let currentBetVal = currentBetObj ? currentBetObj.bet : 1;
-      const maxAllowedCard = p.coins + currentBetVal;
+      
+      const maxAllowedCard = p.coins;
 
-      currentCardBetCount = Math.max(1, currentBetVal);
+      currentCardBetCount = Math.max(1, Math.min(currentBetVal, maxAllowedCard));
 
       return `
         <div style="margin-top:15px; padding-top:10px; border-top:1px dashed var(--border-color);">
@@ -908,19 +933,33 @@
       closeModal();
       const p = gameState.players[pIdx];
 
+      // 【カード④の最終安全ガード】コイン差し引き前に手がかり上限をチェック
+      if (cardNum === 4 && gameState.card4Index[pIdx] >= CLUES.length) {
+        alert("すべての手がかりを確認済みのため、カード④は使用できません。\n（コインは消費されません）");
+        return;
+      }
+
+      // コストの定義
+      let cost = 0;
+      if (cardNum === 1 || cardNum === 2) cost = 3;
+      else if (cardNum === 3) cost = 2;
+      else if (cardNum === 4) cost = 4;
+
+      // 使用可能な場合のみコスト差し引き（所持金総数から減算）
+      p.coins = Math.max(0, p.coins - cost);
+
+      const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
+      const boxCoins = betRec ? betRec.bet : 0;
+      const outsideCoins = Math.max(0, p.coins - boxCoins);
+
       if (cardNum === 1) {
-        p.coins = Math.max(0, p.coins - 3);
         gameState.currentCardLogs[pIdx].push(`カード①(${subType === 'max' ? '最大' : '最小'})`);
 
         const activeBets = gameState.betRecords.map(r => r.bet).filter(b => b > 0);
         let targetVal = activeBets.length > 0 ? (subType === 'max' ? Math.max(...activeBets) : Math.min(...activeBets)) : 'なし';
 
-        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
-        let currentBetVal = currentBetObj ? currentBetObj.bet : 1;
-        const maxAllowedCard = p.coins + currentBetVal;
-
         let content = `
-          <p>現在の所持金: <strong>${p.coins}枚</strong></p>
+          <p>所持金合計: <strong>${p.coins}枚</strong> （箱の中: ${boxCoins}枚 / 箱の外: ${outsideCoins}枚）</p>
           <div class="secret-box">
             賭けに参加しているプレイヤーの賭け金の<strong>${subType === 'max' ? '最大値' : '最小値'}</strong>は<br>
             <span style="font-size:1.8rem; color:var(--accent-orange);">${targetVal}${typeof targetVal === 'number' ? '枚' : ''}</span> です。
@@ -930,21 +969,16 @@
           <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード① 結果", content);
-        updateStepperButtons(currentBetVal, 1, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
+        updateStepperButtons(currentCardBetCount, 1, p.coins, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 2) {
-        p.coins = Math.max(0, p.coins - 3);
         gameState.currentCardLogs[pIdx].push(`カード②(${subType === 'max' ? '最大' : '最小'})`);
 
         const allCoins = gameState.players.map(pl => pl.coins);
         const targetVal = subType === 'max' ? Math.max(...allCoins) : Math.min(...allCoins);
 
-        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
-        let currentBetVal = currentBetObj ? currentBetObj.bet : 1;
-        const maxAllowedCard = p.coins + currentBetVal;
-
         let content = `
-          <p>現在の所持金: <strong>${p.coins}枚</strong></p>
+          <p>所持金合計: <strong>${p.coins}枚</strong> （箱の中: ${boxCoins}枚 / 箱の外: ${outsideCoins}枚）</p>
           <div class="secret-box">
             全プレイヤーの現在の所持金の<strong>${subType === 'max' ? '最大値' : '最小値'}</strong>は<br>
             <span style="font-size:1.8rem; color:var(--accent-orange);">${targetVal}枚</span> です。
@@ -954,18 +988,10 @@
           <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード② 結果", content);
-        updateStepperButtons(currentBetVal, 1, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
+        updateStepperButtons(currentCardBetCount, 1, p.coins, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 3) {
-        p.coins = Math.max(0, p.coins - 2);
-        gameState.currentCardLogs[pIdx].push(`カード③(箱の外のコイン比べ)`);
-
-        const getOutsideCoins = (plIdx) => {
-          const pl = gameState.players[plIdx];
-          const betRec = gameState.betRecords.find(r => r.playerIdx === plIdx);
-          const betVal = betRec ? betRec.bet : 0;
-          return Math.max(0, pl.coins - betVal);
-        };
+        gameState.currentCardLogs[pIdx].push(`カード③(箱の外のコイン数比べ)`);
 
         const myOutside = getOutsideCoins(pIdx);
 
@@ -976,11 +1002,8 @@
           }
         });
 
-        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
-        let currentBetVal = currentBetObj ? currentBetObj.bet : 1;
-        const maxAllowedCard = p.coins + currentBetVal;
-
         let content = `
+          <p>所持金合計: <strong>${p.coins}枚</strong> （箱の中: ${boxCoins}枚 / 箱の外: ${outsideCoins}枚）</p>
           <div class="secret-box" style="text-align:left; line-height:1.8;">
             あなたより箱の外のコインの数が多い人の人数は <strong style="color:var(--accent-orange); font-size:1.4rem;">${richerCount}</strong> 人です<br>
             <span style="font-size:0.8rem; color:var(--text-muted);">※同じ枚数の人もいるかもしれません</span>
@@ -990,23 +1013,16 @@
           <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード③ 結果", content);
-        updateStepperButtons(currentBetVal, 1, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
+        updateStepperButtons(currentCardBetCount, 1, p.coins, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 4) {
-        if (gameState.card4Index[pIdx] >= 6) { alert("すべての手がかりを確認済みです。"); return; }
-
-        p.coins = Math.max(0, p.coins - 4);
         const clueIdx = gameState.card4Index[pIdx];
         const clueText = CLUES[clueIdx];
         gameState.card4Index[pIdx]++;
         gameState.currentCardLogs[pIdx].push(`カード④(手がかり${clueIdx + 1})`);
 
-        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
-        let currentBetVal = currentBetObj ? currentBetObj.bet : 1;
-        const maxAllowedCard = p.coins + currentBetVal;
-
         let content = `
-          <p>現在の所持金: <strong>${p.coins}枚</strong></p>
+          <p>所持金合計: <strong>${p.coins}枚</strong> （箱の中: ${boxCoins}枚 / 箱の外: ${outsideCoins}枚）</p>
           <div class="secret-box">
             <strong>手がかり ${clueIdx + 1}</strong><br>
             <p style="margin-top:10px; font-size:1.1rem; color:var(--accent-orange);">${clueText}</p>
@@ -1016,7 +1032,7 @@
           <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード④ 結果", content);
-        updateStepperButtons(currentBetVal, 1, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
+        updateStepperButtons(currentCardBetCount, 1, p.coins, 'c1-step-minus', 'c1-step-plus');
       }
       saveGame();
     }
@@ -1046,7 +1062,7 @@
       currentDebtCount = 1;
 
       let content = `
-        <p>現在の所持金（箱の中）: <strong>${p.coins}枚</strong> / 借金累計: <strong style="color:var(--danger-color);">${p.totalDebt}枚</strong></p>
+        <p>現在の所持金: <strong>${p.coins}枚</strong> / 借金累計: <strong style="color:var(--danger-color);">${p.totalDebt}枚</strong></p>
         <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで追加借金する枚数を決定してください（制限なし）。</p>
         
         <div class="stepper-container">
@@ -1119,22 +1135,20 @@
 
       let round10ResetMsg = "";
       if (gameState.round === TOTAL_ROUNDS) {
-        // 第10回特別ルール: 「手元（箱の外）に残したコイン枚数＝(支払い前所持金 - 賭け金)」が最も多かった人を0枚リセット
-        // 各プレイヤーの手元残り枚数とタイムスタンプを算出
-        let outsideRecords = gameState.betRecords.map(r => {
-          const originalCoins = gameState.players[r.playerIdx].coins + r.bet; // 支払い前所持コイン
-          const outside = Math.max(0, originalCoins - r.bet);
+        // 第10回特別ルール: 「手元（箱の外）に残したコイン枚数＝現在の所持金（ジャッジ直後）」が最も多かった人を0枚リセット
+        let outsideRecords = gameState.players.map(p => {
+          const betRec = gameState.betRecords.find(r => r.playerIdx === p.id);
           return {
-            playerIdx: r.playerIdx,
-            outside: outside,
-            timestamp: r.timestamp
+            playerIdx: p.id,
+            outside: p.coins,
+            timestamp: betRec ? betRec.timestamp : 0
           };
         });
 
         if (outsideRecords.length > 0) {
           outsideRecords.sort((a, b) => {
-            if (b.outside !== a.outside) return b.outside - a.outside; // 手元が多い順
-            return a.timestamp - b.timestamp; // 同率なら先に決定した人
+            if (b.outside !== a.outside) return b.outside - a.outside;
+            return a.timestamp - b.timestamp;
           });
 
           const resetTargetIdx = outsideRecords[0].playerIdx;
@@ -1170,7 +1184,6 @@
 
     // --- 全10回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定 ＋ 0枚プレイヤーも考慮 ＋ 全員同数没収対応） ---
     function executeFinalJudge() {
-      // 0枚のプレイヤーも「bet: 0」として考慮（判定対象）に含める
       const activeEntries = gameState.players.map(p => ({
         playerIdx: p.id,
         bet: p.coins,
@@ -1181,7 +1194,6 @@
       let totalPot = gameState.players.reduce((sum, p) => sum + p.coins, 0);
       let judgeMsg = "";
 
-      // 全員の所持コインが同じ場合 ➔ 全額没収
       if (uniqueBets.length === 1 && activeEntries.length === gameState.players.length) {
         gameState.players.forEach(p => p.coins = 0);
         judgeMsg = `<strong style="color:var(--danger-color); font-size:1.2rem;">【全員所持コイン没収！】</strong><br>全員の所持コイン（箱の中身）が全く同じ（${uniqueBets[0]}枚）だったため、コインは誰のもとにも支払われず<strong>全額没収（0枚）</strong>となります！`;
@@ -1199,7 +1211,6 @@
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、全額総取りは発生しませんでした。`;
       }
 
-      // 最終収支の内訳テキスト作成（借金額をマイナス換算）
       let detailsHtml = `<div style="margin-top:15px; text-align:left; font-size:0.95rem; border-top:1px dashed var(--border-color); padding-top:10px;">`;
       detailsHtml += `<p style="font-weight:bold; color:var(--accent-orange); margin-bottom:8px;">【各プレイヤーの最終収支（借金を差し引き）】</p>`;
       
@@ -1327,7 +1338,7 @@
       }
     }
 
-    // --- 順位表示画面（実質所持コイン：所持コイン - 借金順） ---
+    // --- 順位表示画面 ---
     function renderResultScreen() {
       const finalResults = gameState.players.map(p => {
         const net = p.coins - p.totalDebt;
@@ -1454,12 +1465,13 @@
             <li>※ジャッジ終了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
             <li>※10回目の賭けの終了後、順位が表示されます。</li>
           </ul>
-          <h4 style="color:var(--accent-orange);">カードコスト</h4>
+          <h4 style="color:var(--accent-orange);">カードコスト規約</h4>
           <ul class="rules-list">
             <li>カード①（賭け金最大・最小）: コスト3枚</li>
             <li>カード②（所持金最大・最小）: コスト3枚</li>
             <li>カード③（箱の外のコイン数比べ）: コスト2枚</li>
             <li>カード④（重大な手がかり）: コスト4枚</li>
+            <li>※カード使用コストは、<strong>箱の外にあるコインからのみ支払うことが可能</strong>です。箱の中のコインから補填することはできません。</li>
           </ul>
           <h4 style="color:var(--accent-orange);">第10回特別ルール</h4>
           <p>通常ジャッジ処理後、手元（箱の外）に最も多くコインを残してしまったプレイヤー（全体の所持金 − 賭け金 が最大）の所持金が 0枚にリセット されます。</p>
