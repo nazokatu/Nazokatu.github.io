@@ -369,17 +369,17 @@
     <div id="setup-screen" class="screen active">
       <h2>ゲームセットアップ</h2>
       <div id="name-input-card" class="card" style="margin-top:20px; text-align:center;">
-        <h3>あなたの名前を入力してください</h3>
-        <p style="color:var(--text-muted); font-size:0.85rem; margin:10px 0;">※小文字のアルファベット（a-z）で入力してください。</p>
+        <h3>あなたの名前を決定してください</h3>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin:10px 0;">※小文字のアルファベット（a-z）で決定してください。</p>
         <input type="text" id="single-name-input" placeholder="例: taro" style="text-transform: lowercase;">
         <br>
         <div style="margin: 10px 0;">
-          <button onclick="submitNextName()">登録</button>
+          <button onclick="submitNextName()">決定</button>
         </div>
 
         <div style="margin-top:25px; padding-top:15px; border-top:1px dashed var(--border-color); display:flex; flex-direction:column; gap:8px; align-items:center;">
-          <button class="secondary" style="font-size:1rem;" onclick="finishNameSetup()">すべてのプレイヤーの登録が完了した</button>
-          <button class="danger" style="font-size:0.85rem;" onclick="resetAllRegisteredNames()">すべてのプレイヤーを登録し直す</button>
+          <button class="secondary" style="font-size:1rem;" onclick="finishNameSetup()">すべてのプレイヤーの決定が完了した</button>
+          <button class="danger" style="font-size:0.85rem;" onclick="resetAllRegisteredNames()">すべてのプレイヤーを決定し直す</button>
         </div>
       </div>
 
@@ -503,11 +503,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v13', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v14', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v13');
+      const saved = localStorage.getItem('halloween_game_state_v14');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -519,7 +519,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v13');
+      localStorage.removeItem('halloween_game_state_v14');
       location.reload();
     }
 
@@ -535,40 +535,40 @@
       const val = input.value.trim().toLowerCase();
 
       if (!val) {
-        alert("名前を入力してください。");
+        alert("名前を決定してください。");
         return;
       }
 
       if (!/^[a-z]+$/.test(val)) {
-        alert("名前は小文字のアルファベット（a-z）のみで入力してください。");
+        alert("名前は小文字のアルファベット（a-z）のみで決定してください。");
         return;
       }
 
       if (tempPlayerNames.includes(val)) {
-        alert("その名前は既に登録されています。別の名前を入力してください。");
+        alert("その名前は既に決定されています。別の名前を決定してください。");
         return;
       }
 
       tempPlayerNames.push(val);
       input.value = '';
-      alert(`「${val}」を登録しました。`);
+      alert(`「${val}」を決定しました。`);
     }
 
     function resetAllRegisteredNames() {
       if (tempPlayerNames.length === 0) {
-        alert("まだ誰も登録されていません。");
+        alert("まだ誰も決定されていません。");
         return;
       }
-      if (confirm("登録されたプレイヤー名をすべてリセットしますか？")) {
+      if (confirm("決定されたプレイヤー名をすべてリセットしますか？")) {
         tempPlayerNames = [];
         document.getElementById('single-name-input').value = '';
-        alert("登録名をリセットしました。");
+        alert("決定名をリセットしました。");
       }
     }
 
     function finishNameSetup() {
       if (tempPlayerNames.length < 2) {
-        alert("ゲームを開始するには少なくとも2名以上の登録が必要です。");
+        alert("ゲームを開始するには少なくとも2名以上の決定が必要です。");
         return;
       }
 
@@ -649,21 +649,21 @@
       }
     }
 
-    // --- ステップ1: 賭け金入力 ---
+    // --- ステップ1: 賭け金決定 ---
     function renderBetPhase(container) {
       const allSubmitted = gameState.betRecords.length >= gameState.players.length;
 
       let html = `
         <div class="card" style="text-align:center;">
-          <h3>【ステップ 1】 賭け金の入力 （箱を閉じた順）</h3>
+          <h3>【ステップ 1】 賭け金の決定 （箱を閉じた順）</h3>
           <p style="font-size: 0.9rem; color: var(--text-muted); margin: 10px 0;">
-            箱を閉じたプレイヤーから順番にPCを操作して賭け金を選択してください。
+            箱を閉じたプレイヤーから順番にPCを操作して賭け金を決定してください。
           </p>
 
           ${!allSubmitted ?
-            `<button style="font-size:1.1rem; padding:12px 24px; margin: 15px 0;" onclick="startSinglePlayerBetText()">賭け金を選択する</button>` :
+            `<button style="font-size:1.1rem; padding:12px 24px; margin: 15px 0;" onclick="startSinglePlayerBetText()">賭け金を決定する</button>` :
             `<div style="margin:20px 0; background:rgba(56, 176, 0, 0.1); padding:15px; border-radius:8px;">
-               <p style="color:var(--success-color); font-weight:bold;">全員の賭け金選択が完了しました！</p>
+               <p style="color:var(--success-color); font-weight:bold;">全員の賭け金決定が完了しました！</p>
              </div>
              <button style="font-size:1.1rem; padding:12px 24px;" onclick="proceedToCardPhase()">カード使用フェーズへ進む</button>`
           }
@@ -674,12 +674,12 @@
 
     function startSinglePlayerBetText() {
       let content = `
-        <p style="margin-bottom:10px;">賭け金を入力するプレイヤーの名前を入力してください。</p>
-        <input type="text" id="bet-name-search" placeholder="名前を小文字アルファベットで入力" style="text-transform: lowercase;">
+        <p style="margin-bottom:10px;">賭け金を決定するプレイヤーの名前を決定してください。</p>
+        <input type="text" id="bet-name-search" placeholder="名前を小文字アルファベットで決定" style="text-transform: lowercase;">
         <br><br>
-        <button onclick="verifyPlayerForBet()">次へ</button>
+        <button onclick="verifyPlayerForBet()">決定</button>
       `;
-      showModal("プレイヤー入力", content);
+      showModal("プレイヤーの決定", content);
     }
 
     function verifyPlayerForBet() {
@@ -687,7 +687,7 @@
       const pIdx = gameState.players.findIndex(p => p.name === inputName);
 
       if (pIdx === -1) {
-        alert("該当するプレイヤーが見つかりません。登録した名前（小文字）を正しく入力してください。");
+        alert("該当するプレイヤーが見つかりません。決定した名前（小文字）を正しく決定してください。");
         return;
       }
 
@@ -697,7 +697,7 @@
 
       let content = `
         <p style="margin-bottom:10px;">現在の所持金（箱の中）: <strong style="color:var(--accent-orange); font-size:1.3rem;">${p.coins}枚</strong></p>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで賭ける枚数を指定してください（0枚は辞退）。</p>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで賭ける枚数を決定してください（0枚は辞退）。</p>
         
         <div class="stepper-container">
           <button type="button" class="btn-step" id="btn-step-minus" onclick="changeBetCount(-1, ${p.coins})">−</button>
@@ -705,9 +705,9 @@
           <button type="button" class="btn-step" id="btn-step-plus" onclick="changeBetCount(1, ${p.coins})">＋</button>
         </div>
 
-        <button onclick="confirmSingleBet(${pIdx})">選択を確定して完了</button>
+        <button onclick="confirmSingleBet(${pIdx})">決定する</button>
       `;
-      showModal(`${p.name} の賭け金選択`, content);
+      showModal(`${p.name} の賭け金決定`, content);
       updateStepperButtons(currentBetCount, 0, p.coins, 'btn-step-minus', 'btn-step-plus');
     }
 
@@ -731,7 +731,7 @@
       const p = gameState.players[pIdx];
 
       if (val < 0 || val > p.coins) {
-        alert(`賭け金は 0枚 から ${p.coins}枚 の間で選択してください。`);
+        alert(`賭け金は 0枚 から ${p.coins}枚 の間で決定してください。`);
         return;
       }
 
@@ -764,13 +764,13 @@
         <div class="card" style="text-align:center;">
           <h3>【ステップ 2】 カードの使用</h3>
           <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
-            カードを使用する画面です。カードを選択後、名前を入力してください。
+            カードを使用する画面です。カードを選択後、名前を決定してください。
           </p>
 
           <div style="display:flex; flex-direction:column; gap:12px; text-align:left; max-width:600px; margin:0 auto;">
             <div style="border:1px solid var(--border-color); padding:12px; border-radius:8px;">
               <strong>カード①「賭け金最大・最小」</strong> (コスト: 3枚)<br>
-              <span style="font-size:0.8rem; color:var(--text-muted);">辞退者を除く賭け金の最大/最小を確認し、賭け金を変更できます。</span><br>
+              <span style="font-size:0.8rem; color:var(--text-muted);">辞退者を除く賭け金の最大/最小を確認し、賭け金を再決定できます。</span><br>
               <button style="margin-top:5px;" onclick="selectCardToUse(1, 'max')">最大を知る</button>
               <button style="margin-top:5px;" onclick="selectCardToUse(1, 'min')">最小を知る</button>
             </div>
@@ -802,12 +802,12 @@
 
     function selectCardToUse(cardNum, subType = null) {
       let content = `
-        <p style="margin-bottom:10px;">カードを使用するプレイヤーの名前を入力してください。</p>
-        <input type="text" id="card-user-input-name" placeholder="名前を小文字アルファベットで入力" style="text-transform: lowercase;">
+        <p style="margin-bottom:10px;">カードを使用するプレイヤーの名前を決定してください。</p>
+        <input type="text" id="card-user-input-name" placeholder="名前を小文字アルファベットで決定" style="text-transform: lowercase;">
         <br><br>
         <button onclick="askCardCostConfirmation(${cardNum}, '${subType}')">決定</button>
       `;
-      showModal("カード使用者指定", content);
+      showModal("カード使用者の決定", content);
     }
 
     function askCardCostConfirmation(cardNum, subType) {
@@ -815,7 +815,7 @@
       const pIdx = gameState.players.findIndex(p => p.name === inputName);
 
       if (pIdx === -1) {
-        alert("該当するプレイヤーが見つかりません。登録した名前（小文字）を正しく入力してください。");
+        alert("該当するプレイヤーが見つかりません。決定した名前（小文字）を正しく決定してください。");
         return;
       }
 
@@ -856,7 +856,7 @@
 
       return `
         <div style="margin-top:15px; padding-top:10px; border-top:1px dashed var(--border-color);">
-          <p style="font-size:0.9rem; color:var(--text-muted);">自分の賭け金（箱の中のコイン）を変更しますか？</p>
+          <p style="font-size:0.9rem; color:var(--text-muted);">自分の賭け金（箱の中のコイン）を再決定しますか？</p>
           <div class="stepper-container">
             <button type="button" class="btn-step" id="c1-step-minus" onclick="changeCardBetCount(-1, ${maxAllowedCard})">−</button>
             <div class="stepper-val-display" id="stepper-card-val">${currentCardBetCount}枚</div>
@@ -911,7 +911,7 @@
           </div>
           ${buildCardBetChangeUI(pIdx)}
           <br>
-          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
+          <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード① 結果", content);
         updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
@@ -935,7 +935,7 @@
           </div>
           ${buildCardBetChangeUI(pIdx)}
           <br>
-          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
+          <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード② 結果", content);
         updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
@@ -971,7 +971,7 @@
           </div>
           ${buildCardBetChangeUI(pIdx)}
           <br>
-          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
+          <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード③ 結果", content);
         updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
@@ -997,7 +997,7 @@
           </div>
           ${buildCardBetChangeUI(pIdx)}
           <br>
-          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
+          <button onclick="confirmCardBetChange(${pIdx})">決定して閉じる</button>
         `;
         showModal("カード④ 結果", content);
         updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
@@ -1141,10 +1141,10 @@
         <div class="card" style="text-align:center;">
           <h3>【ステップ 3】 借金 ＆ ラウンド完了</h3>
           <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
-            コインを借金したいプレイヤーは「借金をする」を押してください。<br>
+            コインを借金したいプレイヤーは「借金を決定する」を押してください。<br>
             ※借りたコインも箱の中に入れて保管してください。
           </p>
-          <button onclick="openDebtModalText()">借金をする</button>
+          <button onclick="openDebtModalText()">借金を決定する</button>
           <br><br>
           <button class="secondary" style="font-size:1.1rem; padding:12px 24px;" onclick="finishRound()">
             ${isFinalRound ? '全10回の賭けがすべて終了しました（最終結果へ）' : `第 ${gameState.round} 回を終了して次の回へ`}
@@ -1156,12 +1156,12 @@
 
     function openDebtModalText() {
       let content = `
-        <p style="margin-bottom:10px;">借金をするプレイヤーの名前を入力してください。</p>
-        <input type="text" id="debt-user-name" placeholder="名前を小文字アルファベットで入力" style="text-transform: lowercase;">
+        <p style="margin-bottom:10px;">借金を決定するプレイヤーの名前を決定してください。</p>
+        <input type="text" id="debt-user-name" placeholder="名前を小文字アルファベットで決定" style="text-transform: lowercase;">
         <br><br>
-        <button onclick="processSingleDebtText()">次へ</button>
+        <button onclick="processSingleDebtText()">決定</button>
       `;
-      showModal("借金処理", content);
+      showModal("借金の決定", content);
     }
 
     function processSingleDebtText() {
@@ -1169,7 +1169,7 @@
       const pIdx = gameState.players.findIndex(p => p.name === inputName);
 
       if (pIdx === -1) {
-        alert("該当するプレイヤーが見つかりません。登録した名前（小文字）を正しく入力してください。");
+        alert("該当するプレイヤーが見つかりません。決定した名前（小文字）を正しく決定してください。");
         return;
       }
 
@@ -1179,7 +1179,7 @@
 
       let content = `
         <p>現在の所持金（箱の中）: <strong>${p.coins}枚</strong></p>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで借金する枚数を指定してください（制限なし）。</p>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで借金する枚数を決定してください（制限なし）。</p>
         
         <div class="stepper-container">
           <button type="button" class="btn-step" id="debt-step-minus" onclick="changeDebtCount(-1)">−</button>
@@ -1187,9 +1187,9 @@
           <button type="button" class="btn-step" id="debt-step-plus" onclick="changeDebtCount(1)">＋</button>
         </div>
 
-        <button onclick="confirmSingleDebt(${pIdx})">確定して受取る</button>
+        <button onclick="confirmSingleDebt(${pIdx})">決定して受取る</button>
       `;
-      showModal(`${p.name} - 借金手続き`, content);
+      showModal(`${p.name} - 借金の決定`, content);
       updateStepperButtons(currentDebtCount, 1, 9999, 'debt-step-minus', 'debt-step-plus');
     }
 
@@ -1402,7 +1402,7 @@
             <li>コインはすべて箱の中に入れておきます。</li>
             <li>賭け金は0〜所持金全額まで。0枚は辞退扱い。</li>
             <li>賭け金が「2番目に少ない」プレイヤーが全員の賭け金総額＋ボーナス3枚を総取り。</li>
-            <li>2番目が複数の場合、先に箱を閉じた（画面選択した）プレイヤーが勝利。</li>
+            <li>2番目が複数の場合、先に箱を閉じた（画面決定した）プレイヤーが勝利。</li>
             <li>2番目が存在しない場合、コイン移動なし。</li>
             <li>※ジャッジ・借金完了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
             <li>※10回目の賭け・借金の終了後、順位が表示されます。</li>
