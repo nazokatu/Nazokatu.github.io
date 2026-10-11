@@ -283,8 +283,8 @@
       font-weight: bold;
     }
 
-    /* Special Notice Banner for Round 11 */
-    .r11-notice {
+    /* Special Notice Banner for Round 10 */
+    .r10-notice {
       background: rgba(217, 4, 41, 0.15);
       border: 2px solid var(--danger-color);
       border-radius: 8px;
@@ -293,7 +293,7 @@
       text-align: center;
     }
 
-    .r11-notice h3 {
+    .r10-notice h3 {
       color: var(--danger-color);
       font-size: 1.2rem;
       margin-bottom: 5px;
@@ -400,7 +400,7 @@
     <!-- 2. メインゲーム進行画面 -->
     <div id="game-screen" class="screen">
       <div class="status-bar">
-        <div class="round-title" id="round-indicator">第 1 回 / 全11回</div>
+        <div class="round-title" id="round-indicator">第 1 回 / 全10回</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
           <button class="debt-btn-main" onclick="openDebtModalText()">借金</button>
           <button class="secondary" onclick="showRulesModal()">ルール確認</button>
@@ -408,9 +408,9 @@
         </div>
       </div>
 
-      <!-- 第11回特別ルール通知バナー -->
-      <div id="round11-banner" class="r11-notice" style="display:none;">
-        <h3>⚠️【第11回 特別ルール適用中】⚠️</h3>
+      <!-- 第10回特別ルール通知バナー -->
+      <div id="round10-banner" class="r10-notice" style="display:none;">
+        <h3>⚠️【第10回 特別ルール適用中】⚠️</h3>
         <p style="font-size:0.9rem; color:#f1f1f1;">
           ジャッジ終了後、賭け金が最も少なかったプレイヤーの<strong>所持金が 0枚にリセット</strong>されます。
         </p>
@@ -446,10 +446,10 @@
       </div>
     </div>
 
-    <!-- 3. 順位表示画面（第11回終了後） -->
+    <!-- 3. 順位表示画面（第10回終了後） -->
     <div id="result-screen" class="screen">
       <h2 style="color: var(--accent-orange); text-align: center; font-size: 2rem;">現在の順位</h2>
-      <p style="text-align: center; margin-bottom: 20px;">全11回の賭けがすべて終了しました。</p>
+      <p style="text-align: center; margin-bottom: 20px;">全10回の賭けがすべて終了しました。</p>
 
       <div id="final-rankings" style="margin: 15px 0;"></div>
 
@@ -479,8 +479,8 @@
   </div>
 
   <script>
-    const TOTAL_ROUNDS = 11;
-    const INITIAL_COINS = 10;
+    const TOTAL_ROUNDS = 10;
+    const INITIAL_COINS = 11;
 
     let tempPlayerNames = [];
     let currentBetCount = 1;
@@ -513,11 +513,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v17', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v18', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v17');
+      const saved = localStorage.getItem('halloween_game_state_v18');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -529,7 +529,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v17');
+      localStorage.removeItem('halloween_game_state_v18');
       location.reload();
     }
 
@@ -622,7 +622,7 @@
       document.getElementById('game-screen').classList.add('active');
       document.getElementById('round-indicator').innerText = `第 ${gameState.round} 回 / 全${TOTAL_ROUNDS}回`;
 
-      const banner = document.getElementById('round11-banner');
+      const banner = document.getElementById('round10-banner');
       if (gameState.round === TOTAL_ROUNDS) {
         banner.style.display = 'block';
       } else {
@@ -702,9 +702,9 @@
       closeModal();
       const p = gameState.players[pIdx];
 
-      // コインが0枚の場合は自動的に借金モーダルへ誘導
+      // 所持コインが0枚の場合は自動的に借金モーダルへ誘導
       if (p.coins < 1) {
-        alert(`${p.name} の所持コインが1枚未満です。賭けに参加するには最低1枚以上のコインが必要です。先に借金を行ってください。`);
+        alert(`${p.name} の所持コインが0枚です。先に借金を行ってください。`);
         openDebtModalText();
         return;
       }
@@ -713,7 +713,7 @@
 
       let content = `
         <p style="margin-bottom:10px;">現在の所持金（箱の中）: <strong style="color:var(--accent-orange); font-size:1.3rem;">${p.coins}枚</strong></p>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで賭ける枚数を決定してください（※最低1枚以上）。</p>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで賭ける枚数を決定してください。</p>
         
         <div class="stepper-container">
           <button type="button" class="btn-step" id="btn-step-minus" onclick="changeBetCount(-1, ${p.coins})">−</button>
@@ -861,7 +861,7 @@
       showModal(`${p.name} - カード使用確認`, content);
     }
 
-    // 共通の賭け金変更UI（全カード対応・上下カウンター・最低1枚）
+    // 共通の賭け金変更UI（全カード対応・上下カウンター・下限1枚）
     function buildCardBetChangeUI(pIdx) {
       const p = gameState.players[pIdx];
       let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
@@ -872,7 +872,7 @@
 
       return `
         <div style="margin-top:15px; padding-top:10px; border-top:1px dashed var(--border-color);">
-          <p style="font-size:0.9rem; color:var(--text-muted);">自分の賭け金（箱の中のコイン）を再決定しますか？（※最低1枚以上）</p>
+          <p style="font-size:0.9rem; color:var(--text-muted);">自分の賭け金（箱の中のコイン）を再決定しますか？</p>
           <div class="stepper-container">
             <button type="button" class="btn-step" id="c1-step-minus" onclick="changeCardBetCount(-1, ${maxAllowedCard})">−</button>
             <div class="stepper-val-display" id="stepper-card-val">${currentCardBetCount}枚</div>
@@ -1113,7 +1113,7 @@
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、<strong>コインの移動は発生しません</strong>。`;
       }
 
-      let round11ResetMsg = "";
+      let round10ResetMsg = "";
       if (gameState.round === TOTAL_ROUNDS) {
         let lowestBetEntries = [...activeEntries];
         if (lowestBetEntries.length > 0) {
@@ -1123,7 +1123,7 @@
           });
           const resetTargetIdx = lowestBetEntries[0].playerIdx;
           gameState.players[resetTargetIdx].coins = 0;
-          round11ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第11回特別ルール適用】</span><br>賭け金が最も少なかった <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
+          round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>賭け金が最も少なかった <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
         }
       }
 
@@ -1142,7 +1142,7 @@
       let resultModalContent = `
         <div class="secret-box" style="text-align:left;">
           ${judgeMsg}
-          ${round11ResetMsg}
+          ${round10ResetMsg}
         </div>
         <button style="margin-top:15px;" onclick="showBoxInstructionModal()">次へ</button>
       `;
@@ -1150,13 +1150,14 @@
       showModal(`ジャッジ結果`, resultModalContent);
     }
 
-    // --- 全11回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定 ＋ 借金額マイナス計算） ---
+    // --- 全10回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定 ＋ 0枚プレイヤーも考慮） ---
     function executeFinalJudge() {
+      // 0枚のプレイヤーも「bet: 0」として判定対象に含める
       const activeEntries = gameState.players.map(p => ({
         playerIdx: p.id,
         bet: p.coins,
         timestamp: 0
-      })).filter(e => e.bet > 0);
+      }));
 
       const uniqueBets = [...new Set(activeEntries.map(e => e.bet))].sort((a,b) => a - b);
       let totalPot = gameState.players.reduce((sum, p) => sum + p.coins, 0);
@@ -1170,7 +1171,7 @@
         gameState.players.forEach(p => p.coins = 0);
         gameState.players[winnerIdx].coins = totalPot + 3;
 
-        judgeMsg = `所持コイン（箱の中身）が2番目に少ないプレイヤーは <strong>${gameState.players[winnerIdx].name}</strong> です！<br>
+        judgeMsg = `所持コイン（箱の中身）が2番目に少ないプレイヤーは <strong>${gameState.players[winnerIdx].name}</strong> （${secondMinBet}枚） です！<br>
         大逆転により、場のすべての所持コイン（${totalPot}枚＋ボーナス3枚）の合計 <strong>${totalPot + 3}枚</strong> を総取りしました！`;
       } else {
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、全額総取りは発生しませんでした。`;
@@ -1215,7 +1216,7 @@
           すべてのコイン（獲得したコイン含む）を箱の中へ入れて箱を閉めてください。
         </div>
         <button style="margin-top:15px; font-size:1.1rem; padding:12px 24px;" onclick="finishRound()">
-          ${isFinalRound ? '全11回の賭けがすべて終了しました（最終結果へ）' : `確認しました（第 ${gameState.round} 回を終了して次の回へ）`}
+          ${isFinalRound ? '全10回の賭けがすべて終了しました（最終結果へ）' : `確認しました（第 ${gameState.round} 回を終了して次の回へ）`}
         </button>
       `;
       showModal("指示", content);
@@ -1371,7 +1372,7 @@
       });
 
       historyHtml += `</tbody></table></div>`;
-      showModal("全11回の完全履歴", historyHtml);
+      showModal("全10回の完全履歴", historyHtml);
     }
 
     // --- タイマー ---
@@ -1420,15 +1421,15 @@
         <div style="text-align:left; max-height: 60vh; overflow-y: auto; font-size: 0.9rem;">
           <h4 style="color:var(--accent-orange);">基本ルール</h4>
           <ul class="rules-list">
-            <li>全11回。各プレイヤー初期コイン10枚。</li>
+            <li>全10回。各プレイヤー初期コイン11枚。</li>
             <li>コインはすべて箱の中に入れておきます。</li>
-            <li>賭け金は1〜所持金全額まで（必ず1枚以上賭ける）。</li>
+            <li>賭け金は1〜所持金全額まで。</li>
             <li>賭け金が「2番目に少ない」プレイヤーが全員の賭け金総額＋ボーナス3枚を総取り。</li>
             <li>2番目が複数の場合、先に箱を閉じた（画面決定した）プレイヤーが勝利。</li>
             <li>2番目が存在しない場合、コイン移動なし。</li>
             <li>※【借金】画面右上のボタンからいつでも借金が可能です（制限なし）。借りたコインも箱に入れて保管します。</li>
             <li>※ジャッジ終了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
-            <li>※11回目の賭けの終了後、順位が表示されます。</li>
+            <li>※10回目の賭けの終了後、順位が表示されます。</li>
           </ul>
           <h4 style="color:var(--accent-orange);">カードコスト</h4>
           <ul class="rules-list">
@@ -1437,7 +1438,7 @@
             <li>カード③（箱の外のコイン数比べ）: コスト2枚</li>
             <li>カード④（重大な手がかり）: コスト4枚</li>
           </ul>
-          <h4 style="color:var(--accent-orange);">第11回特別ルール</h4>
+          <h4 style="color:var(--accent-orange);">第10回特別ルール</h4>
           <p>通常ジャッジ処理後、賭け金が最も少なかったプレイヤーの所持金が 0枚にリセット されます。</p>
         </div>
       `;
