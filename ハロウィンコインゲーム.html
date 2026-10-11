@@ -412,7 +412,7 @@
       <div id="round10-banner" class="r10-notice" style="display:none;">
         <h3>⚠️【第10回 特別ルール適用中】⚠️</h3>
         <p style="font-size:0.9rem; color:#f1f1f1;">
-          ジャッジ終了後、賭け金が最も少なかったプレイヤーの<strong>所持金が 0枚にリセット</strong>されます。
+          ジャッジ終了後、手元（箱の外）に一番コインを残してしまったプレイヤー（全体の所持金 − 賭け金 が最大）の<strong>所持金が 0枚にリセット</strong>されます。
         </p>
       </div>
 
@@ -513,11 +513,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v19', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v20', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v19');
+      const saved = localStorage.getItem('halloween_game_state_v20');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -529,7 +529,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v19');
+      localStorage.removeItem('halloween_game_state_v20');
       location.reload();
     }
 
@@ -1086,7 +1086,7 @@
         return;
       }
 
-      // コインの支払い処理
+      // コインの支払い処理（賭け金を差し引く）
       gameState.betRecords.forEach(r => {
         gameState.players[r.playerIdx].coins = Math.max(0, gameState.players[r.playerIdx].coins - r.bet);
       });
@@ -1119,15 +1119,29 @@
 
       let round10ResetMsg = "";
       if (gameState.round === TOTAL_ROUNDS) {
-        let lowestBetEntries = [...activeEntries];
-        if (lowestBetEntries.length > 0) {
-          lowestBetEntries.sort((a,b) => {
-            if (a.bet !== b.bet) return a.bet - b.bet;
-            return a.timestamp - b.timestamp;
+        // 第10回特別ルール: 「手元（箱の外）に残したコイン枚数＝(支払い前所持金 - 賭け金)」が最も多かった人を0枚リセット
+        // 各プレイヤーの手元残り枚数とタイムスタンプを算出
+        let outsideRecords = gameState.betRecords.map(r => {
+          const originalCoins = gameState.players[r.playerIdx].coins + r.bet; // 支払い前所持コイン
+          const outside = Math.max(0, originalCoins - r.bet);
+          return {
+            playerIdx: r.playerIdx,
+            outside: outside,
+            timestamp: r.timestamp
+          };
+        });
+
+        if (outsideRecords.length > 0) {
+          outsideRecords.sort((a, b) => {
+            if (b.outside !== a.outside) return b.outside - a.outside; // 手元が多い順
+            return a.timestamp - b.timestamp; // 同率なら先に決定した人
           });
-          const resetTargetIdx = lowestBetEntries[0].playerIdx;
+
+          const resetTargetIdx = outsideRecords[0].playerIdx;
+          const maxOutsideVal = outsideRecords[0].outside;
+
           gameState.players[resetTargetIdx].coins = 0;
-          round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>賭け金が最も少なかった <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
+          round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>手元（箱の外）に一番多くコインを残してしまった（${maxOutsideVal}枚） <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
         }
       }
 
@@ -1448,7 +1462,7 @@
             <li>カード④（重大な手がかり）: コスト4枚</li>
           </ul>
           <h4 style="color:var(--accent-orange);">第10回特別ルール</h4>
-          <p>通常ジャッジ処理後、賭け金が最も少なかったプレイヤーの所持金が 0枚にリセット されます。</p>
+          <p>通常ジャッジ処理後、手元（箱の外）に最も多くコインを残してしまったプレイヤー（全体の所持金 − 賭け金 が最大）の所持金が 0枚にリセット されます。</p>
         </div>
       `;
       showModal("ハロウィンゲーム ルール確認", rulesHtml);
