@@ -105,32 +105,47 @@
     }
 
     button:disabled {
-      background: #4a4a4a !important;
-      cursor: not-allowed;
+      background: #3a3a3a !important;
+      color: #777 !important;
+      border-color: #444 !important;
+      cursor: not-allowed !important;
       box-shadow: none !important;
       transform: none !important;
-      opacity: 0.5;
+      opacity: 0.4 !important;
     }
 
-    /* 選択ボタン用グリッド */
-    .bet-num-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin: 15px 0;
+    /* 大型数値カウンターUI */
+    .stepper-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
     }
 
-    .btn-num {
-      font-size: 1.2rem;
-      padding: 12px 0;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color);
+    .btn-step {
+      width: 60px;
+      height: 60px;
+      font-size: 2rem;
+      line-height: 1;
+      border-radius: 12px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--accent-purple), #7b2cbf);
     }
 
-    .btn-num.selected {
-      background: var(--accent-orange) !important;
-      border-color: #fff !important;
-      box-shadow: 0 0 10px var(--accent-orange);
+    .stepper-val-display {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: var(--accent-orange);
+      min-width: 90px;
+      text-align: center;
+      background: #0a0710;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 16px;
     }
 
     /* 常時表示ジャッジエリア (落ち着いたトーン) */
@@ -259,8 +274,8 @@
       font-weight: bold;
     }
 
-    /* Special Notice Banner for Round 12 */
-    .r12-notice {
+    /* Special Notice Banner for Round 10 */
+    .r10-notice {
       background: rgba(217, 4, 41, 0.15);
       border: 2px solid var(--danger-color);
       border-radius: 8px;
@@ -269,7 +284,7 @@
       text-align: center;
     }
 
-    .r12-notice h3 {
+    .r10-notice h3 {
       color: var(--danger-color);
       font-size: 1.2rem;
       margin-bottom: 5px;
@@ -376,16 +391,16 @@
     <!-- 2. メインゲーム進行画面 -->
     <div id="game-screen" class="screen">
       <div class="status-bar">
-        <div class="round-title" id="round-indicator">第 1 回 / 全12回</div>
+        <div class="round-title" id="round-indicator">第 1 回 / 全10回</div>
         <div>
           <button class="secondary" onclick="showRulesModal()">ルール確認</button>
           <button class="danger" onclick="confirmReset()">最初からやり直す</button>
         </div>
       </div>
 
-      <!-- 第12回特別ルール通知バナー -->
-      <div id="round12-banner" class="r12-notice" style="display:none;">
-        <h3>⚠️【第12回 特別ルール適用中】⚠️</h3>
+      <!-- 第10回特別ルール通知バナー -->
+      <div id="round10-banner" class="r10-notice" style="display:none;">
+        <h3>⚠️【第10回 特別ルール適用中】⚠️</h3>
         <p style="font-size:0.9rem; color:#f1f1f1;">
           ジャッジ終了後、賭け金が最も少なかったプレイヤーの<strong>所持金が 1枚に変更</strong>されます。
         </p>
@@ -421,10 +436,10 @@
       </div>
     </div>
 
-    <!-- 3. 順位表示画面（第12回終了後） -->
+    <!-- 3. 順位表示画面（第10回終了後） -->
     <div id="result-screen" class="screen">
       <h2 style="color: var(--accent-orange); text-align: center; font-size: 2rem;">現在の順位</h2>
-      <p style="text-align: center; margin-bottom: 20px;">全12回の賭けがすべて終了しました。</p>
+      <p style="text-align: center; margin-bottom: 20px;">全10回の賭けがすべて終了しました。</p>
 
       <div id="final-rankings" style="margin: 15px 0;"></div>
 
@@ -454,13 +469,13 @@
   </div>
 
   <script>
-    const TOTAL_ROUNDS = 12;
-    const INITIAL_COINS = 12;
+    const TOTAL_ROUNDS = 10;
+    const INITIAL_COINS = 10;
 
     let tempPlayerNames = [];
-    let selectedBetVal = 0;
-    let selectedDebtVal = 1;
-    let selectedCard1BetVal = 0;
+    let currentBetCount = 0;
+    let currentDebtCount = 1;
+    let currentCardBetCount = 0;
 
     let gameState = {
       round: 1,
@@ -488,11 +503,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v11', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v13', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v11');
+      const saved = localStorage.getItem('halloween_game_state_v13');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -504,7 +519,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v11');
+      localStorage.removeItem('halloween_game_state_v13');
       location.reload();
     }
 
@@ -597,7 +612,7 @@
       document.getElementById('game-screen').classList.add('active');
       document.getElementById('round-indicator').innerText = `第 ${gameState.round} 回 / 全${TOTAL_ROUNDS}回`;
 
-      const banner = document.getElementById('round12-banner');
+      const banner = document.getElementById('round10-banner');
       if (gameState.round === TOTAL_ROUNDS) {
         banner.style.display = 'block';
       } else {
@@ -678,48 +693,45 @@
 
       closeModal();
       const p = gameState.players[pIdx];
-      const maxAllowed = Math.min(10, p.coins);
-      selectedBetVal = 0;
-
-      let buttonsHtml = '<div class="bet-num-grid">';
-      for (let i = 0; i <= 10; i++) {
-        const isDisabled = i > maxAllowed;
-        const label = i === 0 ? '辞退(0)' : `${i}枚`;
-        buttonsHtml += `
-          <button type="button" class="btn-num ${i === 0 ? 'selected' : ''}" id="bet-btn-${i}" ${isDisabled ? 'disabled' : ''} onclick="selectBetVal(${i})">
-            ${label}
-          </button>
-        `;
-      }
-      buttonsHtml += '</div>';
+      currentBetCount = 0;
 
       let content = `
         <p style="margin-bottom:10px;">現在の所持金（箱の中）: <strong style="color:var(--accent-orange); font-size:1.3rem;">${p.coins}枚</strong></p>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">賭ける枚数ボタンを押して選択してください（最大10枚）。</p>
-        ${buttonsHtml}
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで賭ける枚数を指定してください（0枚は辞退）。</p>
+        
+        <div class="stepper-container">
+          <button type="button" class="btn-step" id="btn-step-minus" onclick="changeBetCount(-1, ${p.coins})">−</button>
+          <div class="stepper-val-display" id="stepper-bet-val">${currentBetCount}枚</div>
+          <button type="button" class="btn-step" id="btn-step-plus" onclick="changeBetCount(1, ${p.coins})">＋</button>
+        </div>
+
         <button onclick="confirmSingleBet(${pIdx})">選択を確定して完了</button>
       `;
       showModal(`${p.name} の賭け金選択`, content);
+      updateStepperButtons(currentBetCount, 0, p.coins, 'btn-step-minus', 'btn-step-plus');
     }
 
-    function selectBetVal(val) {
-      selectedBetVal = val;
-      for (let i = 0; i <= 10; i++) {
-        const btn = document.getElementById(`bet-btn-${i}`);
-        if (btn) {
-          if (i === val) btn.classList.add('selected');
-          else btn.classList.remove('selected');
-        }
-      }
+    function changeBetCount(delta, maxCoins) {
+      currentBetCount = Math.max(0, Math.min(maxCoins, currentBetCount + delta));
+      const display = document.getElementById('stepper-bet-val');
+      if (display) display.innerText = `${currentBetCount}枚`;
+      updateStepperButtons(currentBetCount, 0, maxCoins, 'btn-step-minus', 'btn-step-plus');
+    }
+
+    function updateStepperButtons(val, minVal, maxVal, minusBtnId, plusBtnId) {
+      const minusBtn = document.getElementById(minusBtnId);
+      const plusBtn = document.getElementById(plusBtnId);
+
+      if (minusBtn) minusBtn.disabled = (val <= minVal);
+      if (plusBtn) plusBtn.disabled = (val >= maxVal);
     }
 
     function confirmSingleBet(pIdx) {
-      const val = selectedBetVal;
+      const val = currentBetCount;
       const p = gameState.players[pIdx];
-      const maxAllowed = Math.min(10, p.coins);
 
-      if (val < 0 || val > maxAllowed) {
-        alert(`賭け金は 0枚 から ${maxAllowed}枚 の間で選択してください。`);
+      if (val < 0 || val > p.coins) {
+        alert(`賭け金は 0枚 から ${p.coins}枚 の間で選択してください。`);
         return;
       }
 
@@ -833,6 +845,49 @@
       showModal(`${p.name} - カード使用確認`, content);
     }
 
+    // 共通の賭け金変更UI（全カード対応・上下カウンター）
+    function buildCardBetChangeUI(pIdx) {
+      const p = gameState.players[pIdx];
+      let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
+      let currentBetVal = currentBetObj ? currentBetObj.bet : 0;
+      const maxAllowedCard = p.coins + currentBetVal;
+
+      currentCardBetCount = currentBetVal;
+
+      return `
+        <div style="margin-top:15px; padding-top:10px; border-top:1px dashed var(--border-color);">
+          <p style="font-size:0.9rem; color:var(--text-muted);">自分の賭け金（箱の中のコイン）を変更しますか？</p>
+          <div class="stepper-container">
+            <button type="button" class="btn-step" id="c1-step-minus" onclick="changeCardBetCount(-1, ${maxAllowedCard})">−</button>
+            <div class="stepper-val-display" id="stepper-card-val">${currentCardBetCount}枚</div>
+            <button type="button" class="btn-step" id="c1-step-plus" onclick="changeCardBetCount(1, ${maxAllowedCard})">＋</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function changeCardBetCount(delta, maxCoins) {
+      currentCardBetCount = Math.max(0, Math.min(maxCoins, currentCardBetCount + delta));
+      const display = document.getElementById('stepper-card-val');
+      if (display) display.innerText = `${currentCardBetCount}枚`;
+      updateStepperButtons(currentCardBetCount, 0, maxCoins, 'c1-step-minus', 'c1-step-plus');
+    }
+
+    function confirmCardBetChange(pIdx) {
+      const val = currentCardBetCount;
+      const record = gameState.betRecords.find(r => r.playerIdx === pIdx);
+
+      if (record) {
+        record.bet = val;
+      } else {
+        gameState.betRecords.push({ playerIdx: pIdx, bet: val, timestamp: Date.now() });
+      }
+
+      closeModal();
+      saveGame();
+      renderState();
+    }
+
     function processCardUseWithText(pIdx, cardNum, subType) {
       closeModal();
       const p = gameState.players[pIdx];
@@ -846,21 +901,7 @@
 
         let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
         let currentBetVal = currentBetObj ? currentBetObj.bet : 0;
-        const maxAllowedCard1 = Math.min(10, p.coins + currentBetVal);
-
-        selectedCard1BetVal = currentBetVal;
-
-        let buttonsHtml = '<div class="bet-num-grid">';
-        for (let i = 0; i <= 10; i++) {
-          const isDisabled = i > maxAllowedCard1;
-          const label = i === 0 ? '辞退(0)' : `${i}枚`;
-          buttonsHtml += `
-            <button type="button" class="btn-num ${i === currentBetVal ? 'selected' : ''}" id="c1-bet-btn-${i}" ${isDisabled ? 'disabled' : ''} onclick="selectCard1BetVal(${i})">
-              ${label}
-            </button>
-          `;
-        }
-        buttonsHtml += '</div>';
+        const maxAllowedCard = p.coins + currentBetVal;
 
         let content = `
           <p>現在の所持金: <strong>${p.coins}枚</strong></p>
@@ -868,11 +909,12 @@
             賭けに参加しているプレイヤーの賭け金の<strong>${subType === 'max' ? '最大値' : '最小値'}</strong>は<br>
             <span style="font-size:1.8rem; color:var(--accent-orange);">${targetVal}${typeof targetVal === 'number' ? '枚' : ''}</span> です。
           </div>
-          <p style="margin-top:10px;">自分の賭け金（箱の中のコイン）を変更しますか？</p>
-          ${buttonsHtml}
-          <button onclick="confirmCard1BetChange(${pIdx})">賭け金を更新して閉じる</button>
+          ${buildCardBetChangeUI(pIdx)}
+          <br>
+          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
         `;
         showModal("カード① 結果", content);
+        updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 2) {
         p.coins = Math.max(0, p.coins - 3);
@@ -881,14 +923,22 @@
         const allCoins = gameState.players.map(pl => pl.coins);
         const targetVal = subType === 'max' ? Math.max(...allCoins) : Math.min(...allCoins);
 
+        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
+        let currentBetVal = currentBetObj ? currentBetObj.bet : 0;
+        const maxAllowedCard = p.coins + currentBetVal;
+
         let content = `
           <p>現在の所持金: <strong>${p.coins}枚</strong></p>
           <div class="secret-box">
             全プレイヤーの現在の所持金の<strong>${subType === 'max' ? '最大値' : '最小値'}</strong>は<br>
             <span style="font-size:1.8rem; color:var(--accent-orange);">${targetVal}枚</span> です。
           </div>
+          ${buildCardBetChangeUI(pIdx)}
+          <br>
+          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
         `;
         showModal("カード② 結果", content);
+        updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 3) {
         p.coins = Math.max(0, p.coins - 2);
@@ -910,13 +960,21 @@
           }
         });
 
+        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
+        let currentBetVal = currentBetObj ? currentBetObj.bet : 0;
+        const maxAllowedCard = p.coins + currentBetVal;
+
         let content = `
           <div class="secret-box" style="text-align:left; line-height:1.8;">
             あなたより箱の外のコインの数が多い人の人数は <strong style="color:var(--accent-orange); font-size:1.4rem;">${richerCount}</strong> 人です<br>
             <span style="font-size:0.8rem; color:var(--text-muted);">※同じ枚数の人もいるかもしれません</span>
           </div>
+          ${buildCardBetChangeUI(pIdx)}
+          <br>
+          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
         `;
         showModal("カード③ 結果", content);
+        updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 4) {
         if (gameState.card4Index[pIdx] >= 6) { alert("すべての手がかりを確認済みです。"); return; }
@@ -927,40 +985,24 @@
         gameState.card4Index[pIdx]++;
         gameState.currentCardLogs[pIdx].push(`カード④(手がかり${clueIdx + 1})`);
 
+        let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
+        let currentBetVal = currentBetObj ? currentBetObj.bet : 0;
+        const maxAllowedCard = p.coins + currentBetVal;
+
         let content = `
           <p>現在の所持金: <strong>${p.coins}枚</strong></p>
           <div class="secret-box">
             <strong>手がかり ${clueIdx + 1}</strong><br>
             <p style="margin-top:10px; font-size:1.1rem; color:var(--accent-orange);">${clueText}</p>
           </div>
+          ${buildCardBetChangeUI(pIdx)}
+          <br>
+          <button onclick="confirmCardBetChange(${pIdx})">変更・結果を閉じる</button>
         `;
         showModal("カード④ 結果", content);
+        updateStepperButtons(currentBetVal, 0, maxAllowedCard, 'c1-step-minus', 'c1-step-plus');
       }
       saveGame();
-    }
-
-    function selectCard1BetVal(val) {
-      selectedCard1BetVal = val;
-      for (let i = 0; i <= 10; i++) {
-        const btn = document.getElementById(`c1-bet-btn-${i}`);
-        if (btn) {
-          if (i === val) btn.classList.add('selected');
-          else btn.classList.remove('selected');
-        }
-      }
-    }
-
-    function confirmCard1BetChange(pIdx) {
-      const val = selectedCard1BetVal;
-      const record = gameState.betRecords.find(r => r.playerIdx === pIdx);
-
-      if (record) {
-        record.bet = val;
-      }
-
-      closeModal();
-      saveGame();
-      renderState();
     }
 
     // --- 通常ジャッジ実行 ---
@@ -997,7 +1039,7 @@
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、<strong>コインの移動は発生しません</strong>。`;
       }
 
-      let round12ResetMsg = "";
+      let round10ResetMsg = "";
       if (gameState.round === TOTAL_ROUNDS) {
         let lowestBetEntries = [...activeEntries];
         if (lowestBetEntries.length > 0) {
@@ -1007,7 +1049,7 @@
           });
           const resetTargetIdx = lowestBetEntries[0].playerIdx;
           gameState.players[resetTargetIdx].coins = 1;
-          round12ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第12回特別ルール適用】</span><br>賭け金が最も少なかった <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>1枚に変更</strong> されました！`;
+          round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>賭け金が最も少なかった <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>1枚に変更</strong> されました！`;
         }
       }
 
@@ -1026,7 +1068,7 @@
       let resultModalContent = `
         <div class="secret-box" style="text-align:left;">
           ${judgeMsg}
-          ${round12ResetMsg}
+          ${round10ResetMsg}
         </div>
         <button style="margin-top:15px;" onclick="showBoxInstructionModal()">次へ</button>
       `;
@@ -1034,9 +1076,8 @@
       showModal(`ジャッジ結果`, resultModalContent);
     }
 
-    // --- 全12回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定） ---
+    // --- 全10回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定） ---
     function executeFinalJudge() {
-      // 全員が箱の中に全所持コインを入れている状態として、coinsをそのまま賭け金として扱う
       const activeEntries = gameState.players.map(p => ({
         playerIdx: p.id,
         bet: p.coins,
@@ -1052,7 +1093,6 @@
         const candidates = activeEntries.filter(e => e.bet === secondMinBet);
         const winnerIdx = candidates[0].playerIdx;
 
-        // 勝者以外のコインを0にし、勝者が全額（＋ボーナス3枚）獲得
         gameState.players.forEach(p => p.coins = 0);
         gameState.players[winnerIdx].coins = totalPot + 3;
 
@@ -1063,7 +1103,7 @@
       }
 
       saveGame();
-      renderResultScreen(); // 画面の順位表を更新
+      renderResultScreen();
 
       let resultModalContent = `
         <div class="secret-box" style="text-align:left;">
@@ -1107,7 +1147,7 @@
           <button onclick="openDebtModalText()">借金をする</button>
           <br><br>
           <button class="secondary" style="font-size:1.1rem; padding:12px 24px;" onclick="finishRound()">
-            ${isFinalRound ? '全12回の賭けがすべて終了しました（最終結果へ）' : `第 ${gameState.round} 回を終了して次の回へ`}
+            ${isFinalRound ? '全10回の賭けがすべて終了しました（最終結果へ）' : `第 ${gameState.round} 回を終了して次の回へ`}
           </button>
         </div>
       `;
@@ -1135,40 +1175,33 @@
 
       closeModal();
       const p = gameState.players[pIdx];
-      selectedDebtVal = 1;
-
-      let buttonsHtml = '<div class="bet-num-grid">';
-      for (let i = 1; i <= 10; i++) {
-        buttonsHtml += `
-          <button type="button" class="btn-num ${i === 1 ? 'selected' : ''}" id="debt-btn-${i}" onclick="selectDebtVal(${i})">
-            ${i}枚
-          </button>
-        `;
-      }
-      buttonsHtml += '</div>';
+      currentDebtCount = 1;
 
       let content = `
         <p>現在の所持金（箱の中）: <strong>${p.coins}枚</strong></p>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">借金する枚数ボタンを押して選択してください（1〜10枚）。</p>
-        ${buttonsHtml}
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">上下ボタンで借金する枚数を指定してください（制限なし）。</p>
+        
+        <div class="stepper-container">
+          <button type="button" class="btn-step" id="debt-step-minus" onclick="changeDebtCount(-1)">−</button>
+          <div class="stepper-val-display" id="stepper-debt-val">${currentDebtCount}枚</div>
+          <button type="button" class="btn-step" id="debt-step-plus" onclick="changeDebtCount(1)">＋</button>
+        </div>
+
         <button onclick="confirmSingleDebt(${pIdx})">確定して受取る</button>
       `;
       showModal(`${p.name} - 借金手続き`, content);
+      updateStepperButtons(currentDebtCount, 1, 9999, 'debt-step-minus', 'debt-step-plus');
     }
 
-    function selectDebtVal(val) {
-      selectedDebtVal = val;
-      for (let i = 1; i <= 10; i++) {
-        const btn = document.getElementById(`debt-btn-${i}`);
-        if (btn) {
-          if (i === val) btn.classList.add('selected');
-          else btn.classList.remove('selected');
-        }
-      }
+    function changeDebtCount(delta) {
+      currentDebtCount = Math.max(1, currentDebtCount + delta);
+      const display = document.getElementById('stepper-debt-val');
+      if (display) display.innerText = `${currentDebtCount}枚`;
+      updateStepperButtons(currentDebtCount, 1, 9999, 'debt-step-minus', 'debt-step-plus');
     }
 
     function confirmSingleDebt(pIdx) {
-      const val = selectedDebtVal;
+      const val = currentDebtCount;
       if (val > 0) {
         gameState.players[pIdx].coins += val;
         gameState.players[pIdx].totalDebt += val;
@@ -1316,7 +1349,7 @@
       });
 
       historyHtml += `</tbody></table></div>`;
-      showModal("全12回の完全履歴", historyHtml);
+      showModal("全10回の完全履歴", historyHtml);
     }
 
     // --- タイマー ---
@@ -1365,14 +1398,14 @@
         <div style="text-align:left; max-height: 60vh; overflow-y: auto; font-size: 0.9rem;">
           <h4 style="color:var(--accent-orange);">基本ルール</h4>
           <ul class="rules-list">
-            <li>全12回。各プレイヤー初期コイン12枚。</li>
+            <li>全10回。各プレイヤー初期コイン10枚。</li>
             <li>コインはすべて箱の中に入れておきます。</li>
-            <li>賭け金は0〜10枚（かつ所持金以下）。0枚は辞退扱い。</li>
+            <li>賭け金は0〜所持金全額まで。0枚は辞退扱い。</li>
             <li>賭け金が「2番目に少ない」プレイヤーが全員の賭け金総額＋ボーナス3枚を総取り。</li>
             <li>2番目が複数の場合、先に箱を閉じた（画面選択した）プレイヤーが勝利。</li>
             <li>2番目が存在しない場合、コイン移動なし。</li>
             <li>※ジャッジ・借金完了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
-            <li>※12回目の賭け・借金の終了後、順位が表示されます。</li>
+            <li>※10回目の賭け・借金の終了後、順位が表示されます。</li>
           </ul>
           <h4 style="color:var(--accent-orange);">カードコスト</h4>
           <ul class="rules-list">
@@ -1381,7 +1414,7 @@
             <li>カード③（箱の外のコイン数比べ）: コスト2枚</li>
             <li>カード④（重大な手がかり）: コスト4枚</li>
           </ul>
-          <h4 style="color:var(--accent-orange);">第12回特別ルール</h4>
+          <h4 style="color:var(--accent-orange);">第10回特別ルール</h4>
           <p>通常ジャッジ処理後、賭け金が最も少なかったプレイヤーの所持金が 1枚に変更されます。</p>
         </div>
       `;
