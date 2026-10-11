@@ -513,11 +513,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v18', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v19', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v18');
+      const saved = localStorage.getItem('halloween_game_state_v19');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -529,7 +529,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v18');
+      localStorage.removeItem('halloween_game_state_v19');
       location.reload();
     }
 
@@ -1086,6 +1086,7 @@
         return;
       }
 
+      // コインの支払い処理
       gameState.betRecords.forEach(r => {
         gameState.players[r.playerIdx].coins = Math.max(0, gameState.players[r.playerIdx].coins - r.bet);
       });
@@ -1097,7 +1098,10 @@
       let judgeMsg = "";
       let totalPot = activeEntries.reduce((sum, e) => sum + e.bet, 0);
 
-      if (uniqueBets.length >= 2) {
+      // 全員が同じ賭け枚数の場合 ➔ 全員没収
+      if (uniqueBets.length === 1 && activeEntries.length === gameState.players.length) {
+        judgeMsg = `<strong style="color:var(--danger-color); font-size:1.2rem;">【全員賭け金没収！】</strong><br>全員が全く同じ枚数（${uniqueBets[0]}枚）を賭けたため、賭け金は誰のもとにも支払われず<strong>全員没収（失う）</strong>となります！`;
+      } else if (uniqueBets.length >= 2) {
         const secondMinBet = uniqueBets[1];
         const candidates = activeEntries.filter(e => e.bet === secondMinBet);
 
@@ -1150,9 +1154,9 @@
       showModal(`ジャッジ結果`, resultModalContent);
     }
 
-    // --- 全10回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定 ＋ 0枚プレイヤーも考慮） ---
+    // --- 全10回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定 ＋ 0枚プレイヤーも考慮 ＋ 全員同数没収対応） ---
     function executeFinalJudge() {
-      // 0枚のプレイヤーも「bet: 0」として判定対象に含める
+      // 0枚のプレイヤーも「bet: 0」として考慮（判定対象）に含める
       const activeEntries = gameState.players.map(p => ({
         playerIdx: p.id,
         bet: p.coins,
@@ -1163,7 +1167,11 @@
       let totalPot = gameState.players.reduce((sum, p) => sum + p.coins, 0);
       let judgeMsg = "";
 
-      if (uniqueBets.length >= 2) {
+      // 全員の所持コインが同じ場合 ➔ 全額没収
+      if (uniqueBets.length === 1 && activeEntries.length === gameState.players.length) {
+        gameState.players.forEach(p => p.coins = 0);
+        judgeMsg = `<strong style="color:var(--danger-color); font-size:1.2rem;">【全員所持コイン没収！】</strong><br>全員の所持コイン（箱の中身）が全く同じ（${uniqueBets[0]}枚）だったため、コインは誰のもとにも支払われず<strong>全額没収（0枚）</strong>となります！`;
+      } else if (uniqueBets.length >= 2) {
         const secondMinBet = uniqueBets[1];
         const candidates = activeEntries.filter(e => e.bet === secondMinBet);
         const winnerIdx = candidates[0].playerIdx;
@@ -1423,10 +1431,11 @@
           <ul class="rules-list">
             <li>全10回。各プレイヤー初期コイン11枚。</li>
             <li>コインはすべて箱の中に入れておきます。</li>
-            <li>賭け金は1〜所持金全額まで。</li>
+            <li>賭け金は所持金全額まで選択可能。</li>
             <li>賭け金が「2番目に少ない」プレイヤーが全員の賭け金総額＋ボーナス3枚を総取り。</li>
             <li>2番目が複数の場合、先に箱を閉じた（画面決定した）プレイヤーが勝利。</li>
             <li>2番目が存在しない場合、コイン移動なし。</li>
+            <li>※【全員が同じ賭け枚数の場合】賭け金はすべて没収され、誰のもとにも戻りません。</li>
             <li>※【借金】画面右上のボタンからいつでも借金が可能です（制限なし）。借りたコインも箱に入れて保管します。</li>
             <li>※ジャッジ終了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
             <li>※10回目の賭けの終了後、順位が表示されます。</li>
