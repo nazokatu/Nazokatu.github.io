@@ -412,7 +412,7 @@
       <div id="round10-banner" class="r10-notice" style="display:none;">
         <h3>⚠️【第10回 特別ルール適用中】⚠️</h3>
         <p style="font-size:0.9rem; color:#f1f1f1;">
-          ジャッジ終了後、手元（箱の外）に一番コインを残してしまったプレイヤー（全体の所持金 − 賭け金 が最大）の<strong>所持金が 0枚にリセット</strong>されます。
+          ジャッジ直前の手元（箱の外）に一番コインを残してしまったプレイヤー（現在の所持金 − 賭け金 が最大）の<strong>所持金が 0枚にリセット</strong>されます。
         </p>
       </div>
 
@@ -448,8 +448,8 @@
 
     <!-- 3. 順位表示画面（第10回終了後） -->
     <div id="result-screen" class="screen">
-      <h2 style="color: var(--accent-orange); text-align: center; font-size: 2rem;">現在の順位</h2>
-      <p style="text-align: center; margin-bottom: 20px;">全10回の賭けがすべて終了しました。</p>
+      <h2 style="color: var(--accent-orange); text-align: center; font-size: 2rem;" id="result-title">現在の順位</h2>
+      <p style="text-align: center; margin-bottom: 20px;" id="result-subtitle">全10回の賭けがすべて終了しました。</p>
 
       <div id="final-rankings" style="margin: 15px 0;"></div>
 
@@ -459,7 +459,7 @@
 
       <!-- 順位表示時も押せるジャッジ実行ボタン（全員の箱の中＝所持コインで判定） -->
       <div style="text-align: center; margin-top: 30px; padding-top:20px; border-top:1px dashed var(--border-color);">
-        <button class="btn-judge-main" onclick="executeFinalJudge()">ジャッジを実行する</button>
+        <button class="btn-judge-main" id="final-judge-btn" onclick="executeFinalJudge()">ジャッジを実行する</button>
         <br><br>
         <button class="danger" onclick="confirmReset()">新しいゲームを開始する</button>
       </div>
@@ -494,7 +494,8 @@
       card4Index: [],
       history: [],
       betRecords: [], // { playerIdx, bet, timestamp }
-      currentCardLogs: []
+      currentCardLogs: [],
+      isFinalJudgeExecuted: false
     };
 
     const CLUES = [
@@ -513,11 +514,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v22', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v24', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v22');
+      const saved = localStorage.getItem('halloween_game_state_v24');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -529,7 +530,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v22');
+      localStorage.removeItem('halloween_game_state_v24');
       location.reload();
     }
 
@@ -539,7 +540,6 @@
       }
     }
 
-    // プレイヤーの「箱の外のコイン数」を取得するヘルパー関数
     function getOutsideCoins(pIdx) {
       const p = gameState.players[pIdx];
       const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
@@ -601,6 +601,7 @@
       gameState.phase = 'bet';
       gameState.history = [];
       gameState.card4Index = new Array(tempPlayerNames.length).fill(0);
+      gameState.isFinalJudgeExecuted = false;
       resetRoundInputs();
 
       saveGame();
@@ -842,7 +843,6 @@
         return;
       }
 
-      // 【追加安全チェック】カード④の手がかり全公開済み事前判定（コスト消費前の完全ブロック）
       if (cardNum === 4 && gameState.card4Index[pIdx] >= CLUES.length) {
         alert(`すべての手がかり（全${CLUES.length}件）を確認済みのため、カード④は使用できません。\n（コインは消費されません）`);
         return;
@@ -856,10 +856,8 @@
       else if (cardNum === 3) cost = 2;
       else if (cardNum === 4) cost = 4;
 
-      // 箱の外のコイン数を算出
       const outsideCoins = getOutsideCoins(pIdx);
 
-      // 箱の外のコインがコスト不足の場合 ➔ 完全使用不可（箱の中から補填不可）
       if (outsideCoins < cost) {
         alert(`カードを使用できません。\nカード使用コスト（${cost}枚）は箱の外のコインからのみ支払う必要があります。\n（現在の箱の外のコイン: ${outsideCoins}枚）\n※箱の中のコインから補填することはできません。`);
         return;
@@ -885,7 +883,6 @@
       showModal(`${p.name} - カード使用確認`, content);
     }
 
-    // 共通の賭け金変更UI（カード①用：コスト支払い後の状態を正しく維持）
     function buildCardBetChangeUI(pIdx) {
       const p = gameState.players[pIdx];
       let currentBetObj = gameState.betRecords.find(r => r.playerIdx === pIdx);
@@ -933,19 +930,16 @@
       closeModal();
       const p = gameState.players[pIdx];
 
-      // 【カード④の最終安全ガード】コイン差し引き前に手がかり上限をチェック
       if (cardNum === 4 && gameState.card4Index[pIdx] >= CLUES.length) {
         alert("すべての手がかりを確認済みのため、カード④は使用できません。\n（コインは消費されません）");
         return;
       }
 
-      // コストの定義
       let cost = 0;
       if (cardNum === 1 || cardNum === 2) cost = 3;
       else if (cardNum === 3) cost = 2;
       else if (cardNum === 4) cost = 4;
 
-      // 使用可能な場合のみコスト差し引き（所持金総数から減算）
       p.coins = Math.max(0, p.coins - cost);
 
       const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
@@ -1102,7 +1096,21 @@
         return;
       }
 
-      // コインの支払い処理（賭け金を差し引く）
+      // ★【要件反映】第10回目ジャッジ処理「直前」の箱の外のコイン数をスナップショット記録★
+      let preJudgeOutsideRecords = [];
+      if (gameState.round === TOTAL_ROUNDS) {
+        preJudgeOutsideRecords = gameState.players.map(p => {
+          const betRec = gameState.betRecords.find(r => r.playerIdx === p.id);
+          const betVal = betRec ? betRec.bet : 0;
+          return {
+            playerIdx: p.id,
+            outside: Math.max(0, p.coins - betVal), // ジャッジ直前の手元残り枚数
+            timestamp: betRec ? betRec.timestamp : 0
+          };
+        });
+      }
+
+      // 通常ジャッジ処理（賭け金の差し引き）
       gameState.betRecords.forEach(r => {
         gameState.players[r.playerIdx].coins = Math.max(0, gameState.players[r.playerIdx].coins - r.bet);
       });
@@ -1114,7 +1122,6 @@
       let judgeMsg = "";
       let totalPot = activeEntries.reduce((sum, e) => sum + e.bet, 0);
 
-      // 全員が同じ賭け枚数の場合 ➔ 全員没収
       if (uniqueBets.length === 1 && activeEntries.length === gameState.players.length) {
         judgeMsg = `<strong style="color:var(--danger-color); font-size:1.2rem;">【全員賭け金没収！】</strong><br>全員が全く同じ枚数（${uniqueBets[0]}枚）を賭けたため、賭け金は誰のもとにも支払われず<strong>全員没収（失う）</strong>となります！`;
       } else if (uniqueBets.length >= 2) {
@@ -1133,30 +1140,20 @@
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、<strong>コインの移動は発生しません</strong>。`;
       }
 
+      // 第10回特別ルール: 直前に記録したスナップショット（手元残り枚数）を参照して判定
       let round10ResetMsg = "";
-      if (gameState.round === TOTAL_ROUNDS) {
-        // 第10回特別ルール: 「手元（箱の外）に残したコイン枚数＝現在の所持金（ジャッジ直後）」が最も多かった人を0枚リセット
-        let outsideRecords = gameState.players.map(p => {
-          const betRec = gameState.betRecords.find(r => r.playerIdx === p.id);
-          return {
-            playerIdx: p.id,
-            outside: p.coins,
-            timestamp: betRec ? betRec.timestamp : 0
-          };
+      if (gameState.round === TOTAL_ROUNDS && preJudgeOutsideRecords.length > 0) {
+        preJudgeOutsideRecords.sort((a, b) => {
+          if (b.outside !== a.outside) return b.outside - a.outside;
+          return a.timestamp - b.timestamp;
         });
 
-        if (outsideRecords.length > 0) {
-          outsideRecords.sort((a, b) => {
-            if (b.outside !== a.outside) return b.outside - a.outside;
-            return a.timestamp - b.timestamp;
-          });
+        const resetTargetIdx = preJudgeOutsideRecords[0].playerIdx;
+        const maxOutsideVal = preJudgeOutsideRecords[0].outside;
 
-          const resetTargetIdx = outsideRecords[0].playerIdx;
-          const maxOutsideVal = outsideRecords[0].outside;
-
-          gameState.players[resetTargetIdx].coins = 0;
-          round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>手元（箱の外）に一番多くコインを残してしまった（${maxOutsideVal}枚） <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
-        }
+        // 対象者の所持金を0枚リセット
+        gameState.players[resetTargetIdx].coins = 0;
+        round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>ジャッジ直前の手元（箱の外）に一番多くコインを残してしまった（${maxOutsideVal}枚） <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
       }
 
       const playerBetArray = new Array(gameState.players.length).fill(0);
@@ -1182,7 +1179,7 @@
       showModal(`ジャッジ結果`, resultModalContent);
     }
 
-    // --- 全10回終了後の「最終ジャッジ」（全員の箱の中＝全所持コインで判定 ＋ 0枚プレイヤーも考慮 ＋ 全員同数没収対応） ---
+    // --- 全10回終了後の「最終ジャッジ」 ---
     function executeFinalJudge() {
       const activeEntries = gameState.players.map(p => ({
         playerIdx: p.id,
@@ -1212,7 +1209,7 @@
       }
 
       let detailsHtml = `<div style="margin-top:15px; text-align:left; font-size:0.95rem; border-top:1px dashed var(--border-color); padding-top:10px;">`;
-      detailsHtml += `<p style="font-weight:bold; color:var(--accent-orange); margin-bottom:8px;">【各プレイヤーの最終収支（借金を差し引き）】</p>`;
+      detailsHtml += `<p style="font-weight:bold; color:var(--accent-orange); margin-bottom:8px;">【各プレイヤーの最終順位（借金を差し引き）】</p>`;
       
       gameState.players.forEach(p => {
         const netCoins = p.coins - p.totalDebt;
@@ -1226,6 +1223,7 @@
       });
       detailsHtml += `</div>`;
 
+      gameState.isFinalJudgeExecuted = true;
       saveGame();
       renderResultScreen();
 
@@ -1239,7 +1237,6 @@
       showModal(`最終ジャッジ結果`, resultModalContent);
     }
 
-    // 全コイン箱格納指示用モーダル
     function showBoxInstructionModal() {
       closeModal();
       const isFinalRound = gameState.round === TOTAL_ROUNDS;
@@ -1313,6 +1310,7 @@
         }
 
         gameState.phase = 'bet';
+        gameState.isFinalJudgeExecuted = false;
         resetRoundInputs();
         saveGame();
         renderState();
@@ -1340,6 +1338,17 @@
 
     // --- 順位表示画面 ---
     function renderResultScreen() {
+      const titleElem = document.getElementById('result-title');
+      const subtitleElem = document.getElementById('result-subtitle');
+
+      if (gameState.isFinalJudgeExecuted) {
+        titleElem.innerText = "最終判定結果";
+        subtitleElem.innerText = "最終ジャッジ後の実質所持コイン順位（借金を差し引き）です。";
+      } else {
+        titleElem.innerText = "現在の順位";
+        subtitleElem.innerText = "全10回の賭けがすべて終了しました（獲得コイン順）。";
+      }
+
       const finalResults = gameState.players.map(p => {
         const net = p.coins - p.totalDebt;
         return {
@@ -1348,21 +1357,41 @@
           debt: p.totalDebt,
           netCoins: net
         };
-      }).sort((a,b) => b.netCoins - a.netCoins);
+      }).sort((a, b) => {
+        if (gameState.isFinalJudgeExecuted) {
+          return b.netCoins - a.netCoins;
+        } else {
+          return b.coins - a.coins;
+        }
+      });
 
       let rankHtml = `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">`;
       finalResults.forEach((res, index) => {
         const sign = res.netCoins > 0 ? '+' : '';
-        rankHtml += `
-          <div class="card" style="border-color: ${index === 0 ? 'var(--accent-orange)' : 'var(--border-color)'}; text-align:center;">
-            <h3 style="color:${index === 0 ? 'var(--accent-orange)' : '#fff'};">第 ${index + 1} 位</h3>
-            <h2 style="margin: 8px 0;">${res.name}</h2>
+        
+        let displayContent = '';
+        if (gameState.isFinalJudgeExecuted) {
+          displayContent = `
             <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">
               獲得: ${res.coins}枚 / 借金: <span style="color:var(--danger-color); font-weight:bold;">-${res.debt}枚</span>
             </div>
             <p style="font-size:1.1rem; border-top:1px dashed var(--border-color); padding-top:8px;">
               実質所持: <strong style="font-size:1.4rem; color:${res.netCoins >= 0 ? 'var(--accent-orange)' : 'var(--danger-color)'};">${sign}${res.netCoins}枚</strong>
             </p>
+          `;
+        } else {
+          displayContent = `
+            <p style="font-size:1.2rem; border-top:1px dashed var(--border-color); padding-top:12px; margin-top:8px;">
+              所持コイン: <strong style="font-size:1.6rem; color:var(--accent-orange);">${res.coins}枚</strong>
+            </p>
+          `;
+        }
+
+        rankHtml += `
+          <div class="card" style="border-color: ${index === 0 ? 'var(--accent-orange)' : 'var(--border-color)'}; text-align:center;">
+            <h3 style="color:${index === 0 ? 'var(--accent-orange)' : '#fff'};">第 ${index + 1} 位</h3>
+            <h2 style="margin: 8px 0;">${res.name}</h2>
+            ${displayContent}
           </div>
         `;
       });
@@ -1474,7 +1503,7 @@
             <li>※カード使用コストは、<strong>箱の外にあるコインからのみ支払うことが可能</strong>です。箱の中のコインから補填することはできません。</li>
           </ul>
           <h4 style="color:var(--accent-orange);">第10回特別ルール</h4>
-          <p>通常ジャッジ処理後、手元（箱の外）に最も多くコインを残してしまったプレイヤー（全体の所持金 − 賭け金 が最大）の所持金が 0枚にリセット されます。</p>
+          <p>通常ジャッジ処理の「直前」に手元（箱の外）に最も多くコインを残してしまったプレイヤー（現在の所持金 − 賭け金 が最大）の所持金が 0枚にリセット されます。</p>
         </div>
       `;
       showModal("ハロウィンゲーム ルール確認", rulesHtml);
