@@ -498,14 +498,21 @@
       isFinalJudgeExecuted: false
     };
 
-    const CLUES = [
-      "1. このゲームには、必勝法が存在する。",
-      "2. 必勝法を実行しない限り、必ず負ける。",
-      "3. 結局、最も多くのコインを持っているプレイヤーが勝つ。",
-      "4. ジャッジのルールをよく確認しろ。",
-      "5. 賭け金の最小を知ることには、大きな意味がある。",
-      "6. 最後のゲームでは、必ず誰かのコインが0枚にリセットされる。"
-    ];
+    // 手がかりを取得する動的ヘルパー関数（全6項目）
+    function getClueText(clueIdx) {
+      const playerCount = gameState.players.length;
+      const calcPlayerNum = Math.max(0, playerCount - 1);
+
+      const clues = [
+        "1. このゲームには、必勝法が存在する。",
+        "2. 必勝法を実行しない限り、必ず負ける。",
+        "3. 最終的にもっとも所持金の多かった人が勝ちとなる。ジャッジは１０回だけとは限らない。",
+        `4. プレイヤーは${calcPlayerNum}人とはかぎらない。`,
+        "5. 試しにたった２枚だけ賭けてみよう。",
+        "6. 最後のゲームでは、必ず誰かのコインが0枚にリセットされる。"
+      ];
+      return clues[clueIdx];
+    }
 
     let timerInterval = null;
 
@@ -514,11 +521,11 @@
     };
 
     function saveGame() {
-      localStorage.setItem('halloween_game_state_v24', JSON.stringify(gameState));
+      localStorage.setItem('halloween_game_state_v28', JSON.stringify(gameState));
     }
 
     function loadGame() {
-      const saved = localStorage.getItem('halloween_game_state_v24');
+      const saved = localStorage.getItem('halloween_game_state_v28');
       if (saved) {
         try {
           gameState = JSON.parse(saved);
@@ -530,7 +537,7 @@
     }
 
     function resetGame() {
-      localStorage.removeItem('halloween_game_state_v24');
+      localStorage.removeItem('halloween_game_state_v28');
       location.reload();
     }
 
@@ -793,10 +800,9 @@
 
           <div style="display:flex; flex-direction:column; gap:12px; text-align:left; max-width:600px; margin:0 auto;">
             <div style="border:1px solid var(--border-color); padding:12px; border-radius:8px;">
-              <strong>カード①「賭け金最大・最小」</strong> (コスト: 3枚)<br>
-              <span style="font-size:0.8rem; color:var(--text-muted);">賭け金の最大/最小を確認し、賭け金を再決定できます。</span><br>
-              <button style="margin-top:5px;" onclick="selectCardToUse(1, 'max')">最大を知る</button>
-              <button style="margin-top:5px;" onclick="selectCardToUse(1, 'min')">最小を知る</button>
+              <strong>カード①「箱の外のコイン数比べ」</strong> (コスト: 2枚)<br>
+              <span style="font-size:0.8rem; color:var(--text-muted);">自分より「箱の外のコイン」が多い人数を確認できます。</span><br>
+              <button style="margin-top:5px;" onclick="selectCardToUse(1)">確認する</button>
             </div>
 
             <div style="border:1px solid var(--border-color); padding:12px; border-radius:8px;">
@@ -807,9 +813,9 @@
             </div>
 
             <div style="border:1px solid var(--border-color); padding:12px; border-radius:8px;">
-              <strong>カード③「箱の外のコイン数比べ」</strong> (コスト: 2枚)<br>
-              <span style="font-size:0.8rem; color:var(--text-muted);">自分より「箱の外のコイン」が多い人数を確認できます。</span><br>
-              <button style="margin-top:5px;" onclick="selectCardToUse(3)">確認する</button>
+              <strong>カード③「特定の人の賭け金を知る」</strong> (コスト: 4枚)<br>
+              <span style="font-size:0.8rem; color:var(--text-muted);">指定した他プレイヤーが今賭けている金額を知ることができます。</span><br>
+              <button style="margin-top:5px;" onclick="selectCardToUse(3)">指定して知る</button>
             </div>
 
             <div style="border:1px solid var(--border-color); padding:12px; border-radius:8px;">
@@ -843,8 +849,8 @@
         return;
       }
 
-      if (cardNum === 4 && gameState.card4Index[pIdx] >= CLUES.length) {
-        alert(`すべての手がかり（全${CLUES.length}件）を確認済みのため、カード④は使用できません。\n（コインは消費されません）`);
+      if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
+        alert("すべての手がかり（全6件）を確認済みのため、カード④は使用できません。\n（コインは消費されません）");
         return;
       }
 
@@ -852,14 +858,32 @@
       const p = gameState.players[pIdx];
 
       let cost = 0;
-      if (cardNum === 1 || cardNum === 2) cost = 3;
-      else if (cardNum === 3) cost = 2;
-      else if (cardNum === 4) cost = 4;
+      if (cardNum === 1) cost = 2;       // 箱の外コイン数比べ
+      else if (cardNum === 2) cost = 3;  // 所持金最大・最小
+      else if (cardNum === 3) cost = 4;  // 特定の人の賭け金を知る
+      else if (cardNum === 4) cost = 4;  // 手がかり
 
       const outsideCoins = getOutsideCoins(pIdx);
 
       if (outsideCoins < cost) {
         alert(`カードを使用できません。\nカード使用コスト（${cost}枚）は箱の外のコインからのみ支払う必要があります。\n（現在の箱の外のコイン: ${outsideCoins}枚）\n※箱の中のコインから補填することはできません。`);
+        return;
+      }
+
+      if (cardNum === 3) {
+        let content = `
+          <p style="color:var(--danger-color); font-weight:bold; font-size:0.85rem; margin-bottom:10px;">
+            ※次の画面は ${p.name} 以外が見えないところで見てください
+          </p>
+          <div class="secret-box">
+            箱の外のコインから <strong>${cost}枚</strong> 払っていただきます。<br>
+            <p style="margin-top:10px; font-size:0.9rem;">賭け金を知りたい他プレイヤーの名前を決定してください：</p>
+            <input type="text" id="target-player-name-input" placeholder="名前（小文字）" style="text-transform: lowercase; margin-top:8px;">
+          </div>
+          <button onclick="processCard3Target(${pIdx})">はい（賭け金を表示）</button>
+          <button class="secondary" onclick="closeModal()">キャンセル</button>
+        `;
+        showModal(`${p.name} - カード③ 使用確認`, content);
         return;
       }
 
@@ -881,6 +905,28 @@
         <button class="secondary" onclick="closeModal()">キャンセル</button>
       `;
       showModal(`${p.name} - カード使用確認`, content);
+    }
+
+    function processCard3Target(userPIdx) {
+      const targetInput = document.getElementById('target-player-name-input');
+      if (!targetInput) return;
+
+      const targetName = targetInput.value.trim().toLowerCase();
+
+      if (targetName === gameState.players[userPIdx].name) {
+        alert("自分自身の賭け金を知ることはできません。他のプレイヤーの名前を入力してください。");
+        return;
+      }
+
+      const targetPIdx = gameState.players.findIndex(p => p.name === targetName);
+
+      if (targetPIdx === -1) {
+        alert("該当するプレイヤーが見つかりません。登録された名前（小文字）を正しく入力してください。");
+        return;
+      }
+
+      closeModal();
+      processCardUseWithText(userPIdx, 3, targetPIdx);
     }
 
     function buildCardBetChangeUI(pIdx) {
@@ -930,15 +976,16 @@
       closeModal();
       const p = gameState.players[pIdx];
 
-      if (cardNum === 4 && gameState.card4Index[pIdx] >= CLUES.length) {
+      if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
         alert("すべての手がかりを確認済みのため、カード④は使用できません。\n（コインは消費されません）");
         return;
       }
 
       let cost = 0;
-      if (cardNum === 1 || cardNum === 2) cost = 3;
-      else if (cardNum === 3) cost = 2;
-      else if (cardNum === 4) cost = 4;
+      if (cardNum === 1) cost = 2;       // 箱の外コイン数比べ
+      else if (cardNum === 2) cost = 3;  // 所持金最大・最小
+      else if (cardNum === 3) cost = 4;  // 特定の人の賭け金を知る
+      else if (cardNum === 4) cost = 4;  // 手がかり
 
       p.coins = Math.max(0, p.coins - cost);
 
@@ -947,16 +994,22 @@
       const outsideCoins = Math.max(0, p.coins - boxCoins);
 
       if (cardNum === 1) {
-        gameState.currentCardLogs[pIdx].push(`カード①(${subType === 'max' ? '最大' : '最小'})`);
+        gameState.currentCardLogs[pIdx].push(`カード①(箱の外のコイン数比べ)`);
 
-        const activeBets = gameState.betRecords.map(r => r.bet).filter(b => b > 0);
-        let targetVal = activeBets.length > 0 ? (subType === 'max' ? Math.max(...activeBets) : Math.min(...activeBets)) : 'なし';
+        const myOutside = getOutsideCoins(pIdx);
+
+        let richerCount = 0;
+        gameState.players.forEach((pl, idx) => {
+          if (getOutsideCoins(idx) > myOutside) {
+            richerCount++;
+          }
+        });
 
         let content = `
           <p>所持金合計: <strong>${p.coins}枚</strong> （箱の中: ${boxCoins}枚 / 箱の外: ${outsideCoins}枚）</p>
-          <div class="secret-box">
-            賭けに参加しているプレイヤーの賭け金の<strong>${subType === 'max' ? '最大値' : '最小値'}</strong>は<br>
-            <span style="font-size:1.8rem; color:var(--accent-orange);">${targetVal}${typeof targetVal === 'number' ? '枚' : ''}</span> です。
+          <div class="secret-box" style="text-align:left; line-height:1.8;">
+            あなたより箱の外のコインの数が多い人の人数は <strong style="color:var(--accent-orange); font-size:1.4rem;">${richerCount}</strong> 人です<br>
+            <span style="font-size:0.8rem; color:var(--text-muted);">※同じ枚数の人もいるかもしれません</span>
           </div>
           ${buildCardBetChangeUI(pIdx)}
           <br>
@@ -985,22 +1038,18 @@
         updateStepperButtons(currentCardBetCount, 1, p.coins, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 3) {
-        gameState.currentCardLogs[pIdx].push(`カード③(箱の外のコイン数比べ)`);
+        const targetPIdx = typeof subType === 'number' ? subType : 0;
+        const targetPlayer = gameState.players[targetPIdx];
+        const targetBetRec = gameState.betRecords.find(r => r.playerIdx === targetPIdx);
+        const targetBetVal = targetBetRec ? targetBetRec.bet : '未決定';
 
-        const myOutside = getOutsideCoins(pIdx);
-
-        let richerCount = 0;
-        gameState.players.forEach((pl, idx) => {
-          if (getOutsideCoins(idx) > myOutside) {
-            richerCount++;
-          }
-        });
+        gameState.currentCardLogs[pIdx].push(`カード③(${targetPlayer.name}の賭け金)`);
 
         let content = `
           <p>所持金合計: <strong>${p.coins}枚</strong> （箱の中: ${boxCoins}枚 / 箱の外: ${outsideCoins}枚）</p>
-          <div class="secret-box" style="text-align:left; line-height:1.8;">
-            あなたより箱の外のコインの数が多い人の人数は <strong style="color:var(--accent-orange); font-size:1.4rem;">${richerCount}</strong> 人です<br>
-            <span style="font-size:0.8rem; color:var(--text-muted);">※同じ枚数の人もいるかもしれません</span>
+          <div class="secret-box">
+            プレイヤー <strong>${targetPlayer.name}</strong> が今賭けている金額（箱の中身）は<br>
+            <span style="font-size:1.8rem; color:var(--accent-orange);">${targetBetVal}${typeof targetBetVal === 'number' ? '枚' : ''}</span> です。
           </div>
           ${buildCardBetChangeUI(pIdx)}
           <br>
@@ -1011,7 +1060,7 @@
 
       } else if (cardNum === 4) {
         const clueIdx = gameState.card4Index[pIdx];
-        const clueText = CLUES[clueIdx];
+        const clueText = getClueText(clueIdx);
         gameState.card4Index[pIdx]++;
         gameState.currentCardLogs[pIdx].push(`カード④(手がかり${clueIdx + 1})`);
 
@@ -1096,7 +1145,7 @@
         return;
       }
 
-      // ★【要件反映】第10回目ジャッジ処理「直前」の箱の外のコイン数をスナップショット記録★
+      // 第10回目ジャッジ処理「直前」の箱の外のコイン数をスナップショット記録
       let preJudgeOutsideRecords = [];
       if (gameState.round === TOTAL_ROUNDS) {
         preJudgeOutsideRecords = gameState.players.map(p => {
@@ -1104,7 +1153,7 @@
           const betVal = betRec ? betRec.bet : 0;
           return {
             playerIdx: p.id,
-            outside: Math.max(0, p.coins - betVal), // ジャッジ直前の手元残り枚数
+            outside: Math.max(0, p.coins - betVal),
             timestamp: betRec ? betRec.timestamp : 0
           };
         });
@@ -1151,7 +1200,6 @@
         const resetTargetIdx = preJudgeOutsideRecords[0].playerIdx;
         const maxOutsideVal = preJudgeOutsideRecords[0].outside;
 
-        // 対象者の所持金を0枚リセット
         gameState.players[resetTargetIdx].coins = 0;
         round10ResetMsg = `<br><br><span style="color:var(--danger-color); font-weight:bold;">【第10回特別ルール適用】</span><br>ジャッジ直前の手元（箱の外）に一番多くコインを残してしまった（${maxOutsideVal}枚） <strong>${gameState.players[resetTargetIdx].name}</strong> の所持金が <strong>0枚にリセット</strong> されました！`;
       }
@@ -1265,16 +1313,20 @@
     function resetCurrentBetPhase() {
       if (confirm("現在のターンの賭け金・カード使用データをやり直しますか？")) {
         if (gameState.history.length > 0) {
-          const lastSnap = gameState.history[gameState.history.length - 1].snapshots;
+          const lastHist = gameState.history[gameState.history.length - 1];
           gameState.players.forEach((p, idx) => {
-            p.coins = lastSnap[idx].coins;
-            p.totalDebt = lastSnap[idx].totalDebt;
+            p.coins = lastHist.snapshots[idx].coins;
+            p.totalDebt = lastHist.snapshots[idx].totalDebt;
           });
+          if (lastHist.card4IndexSnapshot) {
+            gameState.card4Index = [...lastHist.card4IndexSnapshot];
+          }
         } else {
           gameState.players.forEach(p => {
             p.coins = INITIAL_COINS;
             p.totalDebt = 0;
           });
+          gameState.card4Index = new Array(gameState.players.length).fill(0);
         }
         gameState.phase = 'bet';
         resetRoundInputs();
@@ -1490,15 +1542,16 @@
             <li>2番目が複数の場合、先に箱を閉じた（画面決定した）プレイヤーが勝利。</li>
             <li>2番目が存在しない場合、コイン移動なし。</li>
             <li>※【全員が同じ賭け枚数の場合】賭け金はすべて没収され、誰のもとにも戻りません。</li>
-            <li>※【借金】画面右上のボタンからいつでも借金が可能です（制限なし）。借りたコインも箱に入れて保管します。</li>
+            <li>※【借金】画面右上のボタンからいつでも、何枚でも借金が可能です。借りたコインは所持金として扱えます。</li>
+            <li>※借金はゲーム終了後に所持金から強制的に差し引かれます。万が一返済が足りなかった場合は、何としてでも取り立てます。</li>
             <li>※ジャッジ終了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
             <li>※10回目の賭けの終了後、順位が表示されます。</li>
           </ul>
           <h4 style="color:var(--accent-orange);">カードコスト規約</h4>
           <ul class="rules-list">
-            <li>カード①（賭け金最大・最小）: コスト3枚</li>
+            <li>カード①（箱の外のコイン数比べ）: コスト2枚</li>
             <li>カード②（所持金最大・最小）: コスト3枚</li>
-            <li>カード③（箱の外のコイン数比べ）: コスト2枚</li>
+            <li>カード③（特定の人の賭け金を知る）: コスト4枚</li>
             <li>カード④（重大な手がかり）: コスト4枚</li>
             <li>※カード使用コストは、<strong>箱の外にあるコインからのみ支払うことが可能</strong>です。箱の中のコインから補填することはできません。</li>
           </ul>
