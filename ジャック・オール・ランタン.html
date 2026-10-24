@@ -849,6 +849,7 @@
         return;
       }
 
+      /* 【修正2】 カード④が上限に達している場合は、じゃんけん受取人画面や支払い処理に進む前に確実にブロックする */
       if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
         alert("すべての手がかり（全6件）を確認済みのため、カード④は使用できません。\n（コインは消費されません）");
         return;
@@ -901,7 +902,7 @@
             （支払い後 ➔ 箱の中: ${currentBet}枚 / 箱の外: ${outsideCoins - cost}枚）
           </span>
         </div>
-        <button onclick="processCardUseWithText(${pIdx}, ${cardNum}, '${subType}')">はい（カード効果を表示）</button>
+        <button onclick="showCardReceiverModal(${pIdx}, ${cardNum}, '${subType}')">はい（カード効果を表示）</button>
         <button class="secondary" onclick="closeModal()">キャンセル</button>
       `;
       showModal(`${p.name} - カード使用確認`, content);
@@ -926,7 +927,72 @@
       }
 
       closeModal();
-      processCardUseWithText(userPIdx, 3, targetPIdx);
+      showCardReceiverModal(userPIdx, 3, targetPIdx);
+    }
+
+    /* --- カード購入時の受取人（じゃんけん勝者）指定モーダル --- */
+    function showCardReceiverModal(pIdx, cardNum, subType) {
+      closeModal();
+
+      let cost = 0;
+      if (cardNum === 1) cost = 2;
+      else if (cardNum === 2) cost = 3;
+      else if (cardNum === 3) cost = 4;
+      else if (cardNum === 4) cost = 4;
+
+      const buyer = gameState.players[pIdx];
+
+      /* 【修正1 & 2】 受取人モーダル表示直前に、再度カード④の事前チェックと箱の外コインチェックのダブル安全対策 */
+      if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
+        alert("すべての手がかりを確認済みのため、カード④は使用できません。");
+        return;
+      }
+
+      if (getOutsideCoins(pIdx) < cost) {
+        alert(`箱の外のコインが不足しているため、カードを購入できません。`);
+        return;
+      }
+
+      const otherPlayers = gameState.players.filter(p => p.id !== pIdx);
+      let optionsHtml = otherPlayers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+      let content = `
+        <div class="secret-box" style="text-align:left;">
+          <p style="margin-bottom:8px; font-weight:bold; color:var(--accent-orange);">カードのコインを受け取るプレイヤーをじゃんけんで決めてください</p>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">購入者（${buyer.name}）以外のプレイヤー同士で現実にじゃんけんを行い、勝者を1人決定してください。</p>
+          <p style="margin-bottom:6px; font-size:0.9rem;"><strong>じゃんけんの勝者（還元先）を選択してください：</strong></p>
+          <select id="card-receiver-select" style="max-width:100%; margin-bottom:15px;">
+            ${optionsHtml}
+          </select>
+          <p style="font-size:0.8rem; color:var(--text-muted);">※代金 (${cost}枚) がじゃんけん勝者に進呈されます。</p>
+        </div>
+        <button onclick="confirmCardReceiverAndProcess(${pIdx}, ${cardNum}, '${subType}')">決定してカード効果を表示</button>
+      `;
+
+      showModal("カード代金受取人の指定", content);
+    }
+
+    function confirmCardReceiverAndProcess(pIdx, cardNum, subType) {
+      const selectElem = document.getElementById('card-receiver-select');
+      if (!selectElem) return;
+
+      const receiverPIdx = parseInt(selectElem.value, 10);
+      if (isNaN(receiverPIdx)) {
+        alert("受取人を選択してください。");
+        return;
+      }
+
+      let cost = 0;
+      if (cardNum === 1) cost = 2;
+      else if (cardNum === 2) cost = 3;
+      else if (cardNum === 3) cost = 4;
+      else if (cardNum === 4) cost = 4;
+
+      // じゃんけんの勝者にカード代金を還元
+      gameState.players[receiverPIdx].coins += cost;
+
+      closeModal();
+      processCardUseWithText(pIdx, cardNum, subType);
     }
 
     function buildCardBetChangeUI(pIdx) {
@@ -976,17 +1042,13 @@
       closeModal();
       const p = gameState.players[pIdx];
 
-      if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
-        alert("すべての手がかりを確認済みのため、カード④は使用できません。\n（コインは消費されません）");
-        return;
-      }
-
       let cost = 0;
       if (cardNum === 1) cost = 2;       // 箱の外コイン数比べ
       else if (cardNum === 2) cost = 3;  // 所持金最大・最小
       else if (cardNum === 3) cost = 4;  // 特定の人の賭け金を知る
       else if (cardNum === 4) cost = 4;  // 手がかり
 
+      /* 【修正1】 箱の中に賭けているコインを守り、箱の外のコインからのみ正確に差し引く */
       p.coins = Math.max(0, p.coins - cost);
 
       const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
@@ -1038,7 +1100,7 @@
         updateStepperButtons(currentCardBetCount, 1, p.coins, 'c1-step-minus', 'c1-step-plus');
 
       } else if (cardNum === 3) {
-        const targetPIdx = typeof subType === 'number' ? subType : 0;
+        const targetPIdx = typeof subType === 'number' || !isNaN(parseInt(subType, 10)) ? parseInt(subType, 10) : 0;
         const targetPlayer = gameState.players[targetPIdx];
         const targetBetRec = gameState.betRecords.find(r => r.playerIdx === targetPIdx);
         const targetBetVal = targetBetRec ? targetBetRec.bet : '未決定';
@@ -1145,6 +1207,30 @@
         return;
       }
 
+      const activeEntries = gameState.betRecords.filter(r => r.bet > 0);
+      const uniqueBets = [...new Set(activeEntries.map(e => e.bet))].sort((a,b) => a - b);
+
+      /* 全員の賭け金が同額（全プレイヤー同額）の場合のやり直し処理 */
+      if (uniqueBets.length === 1 && activeEntries.length === gameState.players.length) {
+        const sameBetVal = uniqueBets[0];
+        
+        let sameBetMsg = `<strong style="color:var(--accent-orange); font-size:1.2rem;">【全員の賭け金が同額のためやり直し】</strong><br>全員の賭け金が同額（${sameBetVal}枚）だったため、この回の賭けをやり直します。<br><strong>賭け金は全員に返却されました。</strong>`;
+
+        resetRoundInputs();
+        gameState.phase = 'bet';
+        saveGame();
+
+        let resultModalContent = `
+          <div class="secret-box" style="text-align:left;">
+            ${sameBetMsg}
+          </div>
+          <button style="margin-top:15px;" onclick="closeModalAndRebet()">第 ${gameState.round} 回をもう一度行う</button>
+        `;
+
+        showModal(`ジャッジ結果（やり直し）`, resultModalContent);
+        return;
+      }
+
       // 第10回目ジャッジ処理「直前」の箱の外のコイン数をスナップショット記録
       let preJudgeOutsideRecords = [];
       if (gameState.round === TOTAL_ROUNDS) {
@@ -1164,27 +1250,22 @@
         gameState.players[r.playerIdx].coins = Math.max(0, gameState.players[r.playerIdx].coins - r.bet);
       });
 
-      const activeEntries = gameState.betRecords.filter(r => r.bet > 0);
-      const uniqueBets = [...new Set(activeEntries.map(e => e.bet))].sort((a,b) => a - b);
-
       let winnerIdx = -1;
       let judgeMsg = "";
       let totalPot = activeEntries.reduce((sum, e) => sum + e.bet, 0);
 
-      if (uniqueBets.length === 1 && activeEntries.length === gameState.players.length) {
-        judgeMsg = `<strong style="color:var(--danger-color); font-size:1.2rem;">【全員賭け金没収！】</strong><br>全員が全く同じ枚数（${uniqueBets[0]}枚）を賭けたため、賭け金は誰のもとにも支払われず<strong>全員没収（失う）</strong>となります！`;
-      } else if (uniqueBets.length >= 2) {
+      if (uniqueBets.length >= 2) {
         const secondMinBet = uniqueBets[1];
         const candidates = activeEntries.filter(e => e.bet === secondMinBet);
 
         candidates.sort((a,b) => a.timestamp - b.timestamp);
         winnerIdx = candidates[0].playerIdx;
 
-        const totalWon = totalPot + 3;
+        const totalWon = totalPot;
         gameState.players[winnerIdx].coins += totalWon;
 
         judgeMsg = `2番目に少ない賭け金のプレイヤーは <strong>${gameState.players[winnerIdx].name}</strong> です！<br>
-        獲得コイン: <strong>${totalWon}枚</strong> （全賭け金${totalPot}枚 ＋ ボーナス3枚）`;
+        獲得コイン: <strong>${totalWon}枚</strong> （全賭け金総取り）`;
       } else {
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、<strong>コインの移動は発生しません</strong>。`;
       }
@@ -1227,6 +1308,11 @@
       showModal(`ジャッジ結果`, resultModalContent);
     }
 
+    function closeModalAndRebet() {
+      closeModal();
+      renderState();
+    }
+
     // --- 全10回終了後の「最終ジャッジ」 ---
     function executeFinalJudge() {
       const activeEntries = gameState.players.map(p => ({
@@ -1248,10 +1334,10 @@
         const winnerIdx = candidates[0].playerIdx;
 
         gameState.players.forEach(p => p.coins = 0);
-        gameState.players[winnerIdx].coins = totalPot + 3;
+        gameState.players[winnerIdx].coins = totalPot;
 
         judgeMsg = `所持コイン（箱の中身）が2番目に少ないプレイヤーは <strong>${gameState.players[winnerIdx].name}</strong> （${secondMinBet}枚） です！<br>
-        大逆転により、場のすべての所持コイン（${totalPot}枚＋ボーナス3枚）の合計 <strong>${totalPot + 3}枚</strong> を総取りしました！`;
+        大逆転により、場のすべての所持コイン <strong>${totalPot}枚</strong> を総取りしました！`;
       } else {
         judgeMsg = `条件に該当する「2番目に少ないプレイヤー」が存在しないため、全額総取りは発生しませんでした。`;
       }
@@ -1530,6 +1616,7 @@
       document.getElementById('modal-overlay').classList.remove('active');
     }
 
+    /* --- ルール確認画面 --- */
     function showRulesModal() {
       let rulesHtml = `
         <div style="text-align:left; max-height: 60vh; overflow-y: auto; font-size: 0.9rem;">
@@ -1538,10 +1625,10 @@
             <li>全10回。各プレイヤー初期コイン11枚。</li>
             <li>コインはすべて箱の中に入れておきます。</li>
             <li>賭け金は所持金全額まで選択可能。</li>
-            <li>賭け金が「2番目に少ない」プレイヤーが全員の賭け金総額＋ボーナス3枚を総取り。</li>
+            <li>賭け金が「2番目に少ない」プレイヤーが全員の賭け金総額を総取り。</li>
             <li>2番目が複数の場合、先に箱を閉じた（画面決定した）プレイヤーが勝利。</li>
             <li>2番目が存在しない場合、コイン移動なし。</li>
-            <li>※【全員が同じ賭け枚数の場合】賭け金はすべて没収され、誰のもとにも戻りません。</li>
+            <li>※【全員の賭け金が同額の場合】勝者は決定されず、賭け金は全員に全額返却された上で、同じ回の賭けをやり直します。</li>
             <li>※【借金】画面右上のボタンからいつでも、何枚でも借金が可能です。借りたコインは所持金として扱えます。</li>
             <li>※借金はゲーム終了後に所持金から強制的に差し引かれます。万が一返済が足りなかった場合は、何としてでも取り立てます。</li>
             <li>※ジャッジ終了後は、すべてのコインを箱の中へ戻して箱を閉じます。</li>
@@ -1553,7 +1640,8 @@
             <li>カード②（所持金最大・最小）: コスト3枚</li>
             <li>カード③（特定の人の賭け金を知る）: コスト4枚</li>
             <li>カード④（重大な手がかり）: コスト4枚</li>
-            <li>※カード使用コストは、<strong>箱の外にあるコインからのみ支払うことが可能</strong>です。箱の中のコインから補填することはできません。</li>
+            <li>※カード代金は購入者の<strong>箱の外にあるコインからのみ支払うことが可能</strong>です。箱の中のコインから補填することはできません。</li>
+            <li>※カード購入時、購入者以外のプレイヤー同士でじゃんけんを行い、勝者（受取人）にカード代金が送られます。</li>
           </ul>
           <h4 style="color:var(--accent-orange);">第10回特別ルール</h4>
           <p>通常ジャッジ処理の「直前」に手元（箱の外）に最も多くコインを残してしまったプレイヤー（現在の所持金 − 賭け金 が最大）の所持金が 0枚にリセット されます。</p>
