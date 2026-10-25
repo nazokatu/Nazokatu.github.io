@@ -425,7 +425,8 @@
         <div>
           <button onclick="startTimer(120, '思考時間')">思考時間(2分)</button>
           <button onclick="startTimer(120, '密会時間')">密会(2分)</button>
-          <button class="secondary" onclick="stopTimer()">停止</button>
+          <button class="secondary" id="timer-toggle-btn" onclick="toggleTimer()">⏸️ 一時停止</button>
+          <button class="danger" style="font-size:0.85rem;" onclick="stopTimer()">リセット</button>
         </div>
       </div>
 
@@ -514,7 +515,11 @@
       return clues[clueIdx];
     }
 
+    // タイマー管理用変数
     let timerInterval = null;
+    let timerRemainingSeconds = 0;
+    let timerCurrentLabel = "思考時間";
+    let isTimerPaused = false;
 
     window.onload = function() {
       loadGame();
@@ -537,6 +542,7 @@
     }
 
     function resetGame() {
+      stopTimer();
       localStorage.removeItem('halloween_game_state_v28');
       location.reload();
     }
@@ -630,6 +636,7 @@
       }
 
       if (gameState.round > TOTAL_ROUNDS) {
+        stopTimer();
         renderResultScreen();
         document.getElementById('result-screen').classList.add('active');
         return;
@@ -784,6 +791,7 @@
     }
 
     function proceedToCardPhase() {
+      stopTimer(); // カード使用フェーズ移行時にタイマー停止
       gameState.phase = 'card';
       saveGame();
       renderState();
@@ -849,7 +857,6 @@
         return;
       }
 
-      /* 【修正2】 カード④が上限に達している場合は、じゃんけん受取人画面や支払い処理に進む前に確実にブロックする */
       if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
         alert("すべての手がかり（全6件）を確認済みのため、カード④は使用できません。\n（コインは消費されません）");
         return;
@@ -930,7 +937,7 @@
       showCardReceiverModal(userPIdx, 3, targetPIdx);
     }
 
-    /* --- カード購入時の受取人（じゃんけん勝者）指定モーダル --- */
+    /* --- 【修正】カード購入時の受取人（じゃんけん勝者）指定モーダル（選択式から入力式へ変更） --- */
     function showCardReceiverModal(pIdx, cardNum, subType) {
       closeModal();
 
@@ -942,7 +949,6 @@
 
       const buyer = gameState.players[pIdx];
 
-      /* 【修正1 & 2】 受取人モーダル表示直前に、再度カード④の事前チェックと箱の外コインチェックのダブル安全対策 */
       if (cardNum === 4 && gameState.card4Index[pIdx] >= 6) {
         alert("すべての手がかりを確認済みのため、カード④は使用できません。");
         return;
@@ -953,17 +959,12 @@
         return;
       }
 
-      const otherPlayers = gameState.players.filter(p => p.id !== pIdx);
-      let optionsHtml = otherPlayers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-
       let content = `
         <div class="secret-box" style="text-align:left;">
           <p style="margin-bottom:8px; font-weight:bold; color:var(--accent-orange);">カードのコインを受け取るプレイヤーをじゃんけんで決めてください</p>
           <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">購入者（${buyer.name}）以外のプレイヤー同士で現実にじゃんけんを行い、勝者を1人決定してください。</p>
-          <p style="margin-bottom:6px; font-size:0.9rem;"><strong>じゃんけんの勝者（還元先）を選択してください：</strong></p>
-          <select id="card-receiver-select" style="max-width:100%; margin-bottom:15px;">
-            ${optionsHtml}
-          </select>
+          <p style="margin-bottom:6px; font-size:0.9rem;"><strong>じゃんけんの勝者の名前を入力してください：</strong></p>
+          <input type="text" id="card-receiver-input-name" placeholder="名前（小文字）" style="text-transform: lowercase; margin-bottom:12px;">
           <p style="font-size:0.8rem; color:var(--text-muted);">※代金 (${cost}枚) がじゃんけん勝者に進呈されます。</p>
         </div>
         <button onclick="confirmCardReceiverAndProcess(${pIdx}, ${cardNum}, '${subType}')">決定してカード効果を表示</button>
@@ -973,12 +974,25 @@
     }
 
     function confirmCardReceiverAndProcess(pIdx, cardNum, subType) {
-      const selectElem = document.getElementById('card-receiver-select');
-      if (!selectElem) return;
+      const inputElem = document.getElementById('card-receiver-input-name');
+      if (!inputElem) return;
 
-      const receiverPIdx = parseInt(selectElem.value, 10);
-      if (isNaN(receiverPIdx)) {
-        alert("受取人を選択してください。");
+      const receiverName = inputElem.value.trim().toLowerCase();
+      const buyer = gameState.players[pIdx];
+
+      if (!receiverName) {
+        alert("じゃんけんの勝者の名前を入力してください。");
+        return;
+      }
+
+      if (receiverName === buyer.name) {
+        alert("カードを購入した本人（" + buyer.name + "）を受取人に指定することはできません。\n購入者以外のプレイヤーを入力してください。");
+        return;
+      }
+
+      const receiverPIdx = gameState.players.findIndex(p => p.name === receiverName);
+      if (receiverPIdx === -1) {
+        alert("該当するプレイヤーが見つかりません。登録された名前（小文字）を正しく入力してください。");
         return;
       }
 
@@ -1048,7 +1062,6 @@
       else if (cardNum === 3) cost = 4;  // 特定の人の賭け金を知る
       else if (cardNum === 4) cost = 4;  // 手がかり
 
-      /* 【修正1】 箱の中に賭けているコインを守り、箱の外のコインからのみ正確に差し引く */
       p.coins = Math.max(0, p.coins - cost);
 
       const betRec = gameState.betRecords.find(r => r.playerIdx === pIdx);
@@ -1207,6 +1220,8 @@
         return;
       }
 
+      stopTimer(); // ジャッジ実行時にタイマーを停止
+
       const activeEntries = gameState.betRecords.filter(r => r.bet > 0);
       const uniqueBets = [...new Set(activeEntries.map(e => e.bet))].sort((a,b) => a - b);
 
@@ -1315,6 +1330,8 @@
 
     // --- 全10回終了後の「最終ジャッジ」 ---
     function executeFinalJudge() {
+      stopTimer(); // 最終ジャッジ時にもタイマー停止
+
       const activeEntries = gameState.players.map(p => ({
         playerIdx: p.id,
         bet: p.coins,
@@ -1388,6 +1405,7 @@
 
     function finishRound() {
       closeModal();
+      stopTimer(); // 次のラウンド進む際にタイマー停止
       gameState.round++;
       gameState.phase = 'bet';
       resetRoundInputs();
@@ -1398,6 +1416,7 @@
     // --- 管理・巻き戻し・スキップ機能 ---
     function resetCurrentBetPhase() {
       if (confirm("現在のターンの賭け金・カード使用データをやり直しますか？")) {
+        stopTimer();
         if (gameState.history.length > 0) {
           const lastHist = gameState.history[gameState.history.length - 1];
           gameState.players.forEach((p, idx) => {
@@ -1428,6 +1447,7 @@
       }
 
       if (confirm("本当に一つ前の賭け（1ターン前）に戻しますか？")) {
+        stopTimer();
         gameState.history.pop();
 
         if (gameState.history.length > 0) {
@@ -1457,6 +1477,7 @@
 
     function skipCurrentRound() {
       if (confirm("現在のラウンドの賭け・ジャッジを行わずに即座に次のラウンドへ進みますか？")) {
+        stopTimer();
         gameState.history.push({
           round: gameState.round,
           bets: new Array(gameState.players.length).fill(0),
@@ -1575,21 +1596,41 @@
       showModal("全10回の完全履歴", historyHtml);
     }
 
-    // --- タイマー ---
+    // --- 【修正・強化】タイマー制御機能 ---
     function startTimer(seconds, label) {
       stopTimer();
-      let remaining = seconds;
+      timerRemainingSeconds = seconds;
+      timerCurrentLabel = label;
+      isTimerPaused = false;
+      
       document.getElementById('timer-label').innerText = label + ':';
-      updateTimerDisplay(remaining);
+      updateTimerDisplay(timerRemainingSeconds);
+      updateTimerToggleButtonText();
+
+      runTimerLoop();
+    }
+
+    function runTimerLoop() {
+      if (timerInterval) clearInterval(timerInterval);
 
       timerInterval = setInterval(() => {
-        remaining--;
-        updateTimerDisplay(remaining);
-        if (remaining <= 0) {
-          stopTimer();
-          alert(`${label}が終了しました！`);
+        if (!isTimerPaused) {
+          timerRemainingSeconds--;
+          updateTimerDisplay(timerRemainingSeconds);
+
+          if (timerRemainingSeconds <= 0) {
+            stopTimer();
+            alert(`${timerCurrentLabel}が終了しました！`);
+          }
         }
       }, 1000);
+    }
+
+    function toggleTimer() {
+      if (timerRemainingSeconds <= 0) return;
+
+      isTimerPaused = !isTimerPaused;
+      updateTimerToggleButtonText();
     }
 
     function stopTimer() {
@@ -1597,12 +1638,30 @@
         clearInterval(timerInterval);
         timerInterval = null;
       }
+      timerRemainingSeconds = 0;
+      isTimerPaused = false;
+      updateTimerDisplay(0);
+      updateTimerToggleButtonText();
+    }
+
+    function updateTimerToggleButtonText() {
+      const btn = document.getElementById('timer-toggle-btn');
+      if (!btn) return;
+
+      if (isTimerPaused) {
+        btn.innerText = '▶️ 再生';
+        btn.className = 'button';
+      } else {
+        btn.innerText = '⏸️ 一時停止';
+        btn.className = 'secondary';
+      }
     }
 
     function updateTimerDisplay(sec) {
       const m = Math.floor(sec / 60).toString().padStart(2, '0');
       const s = (sec % 60).toString().padStart(2, '0');
-      document.getElementById('timer-display').innerText = `${m}:${s}`;
+      const display = document.getElementById('timer-display');
+      if (display) display.innerText = `${m}:${s}`;
     }
 
     // --- モーダル ---
