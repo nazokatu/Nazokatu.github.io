@@ -458,8 +458,10 @@
         <button class="secondary" onclick="showHistoryModal()">履歴をみる</button>
       </div>
 
-      <!-- 順位表示時も押せるジャッジ実行ボタン（全員の箱の中＝所持コインで判定） -->
+      <!-- 順位表示中も常に操作できる借金・ジャッジボタン -->
       <div style="text-align: center; margin-top: 30px; padding-top:20px; border-top:1px dashed var(--border-color);">
+        <button class="debt-btn-main" onclick="openDebtModalText()">借金</button>
+        <br><br>
         <button class="btn-judge-main" id="final-judge-btn" onclick="executeFinalJudge()">ジャッジを実行する</button>
         <br><br>
         <button class="danger" onclick="confirmReset()">新しいゲームを開始する</button>
