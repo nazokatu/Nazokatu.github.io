@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ドパミントン (DOPAMINTON) - 超感覚3Dバドミントン</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Dela+Gothic+One&family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #04040e;
+            font-family: 'Noto Sans JP', sans-serif;
+            touch-action: manipulation;
+        }
+        .font-impact {
+            font-family: 'Dela Gothic One', 'Noto Sans JP', sans-serif;
+        }
+        .font-cyber {
+            font-family: 'Black Ops One', cursive;
+        }
+        #game-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* 画面フラッシュ＆ZONEオーラ演出 */
+        #screen-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            transition: box-shadow 0.25s ease, background-color 0.08s ease;
+        }
+        .zone-active {
+            box-shadow: inset 0 0 65px rgba(255, 215, 0, 0.75), inset 0 0 130px rgba(255, 0, 128, 0.55);
+            animation: rainbowBorder 1.4s linear infinite;
+        }
+        @keyframes rainbowBorder {
+            0% { box-shadow: inset 0 0 70px rgba(255, 0, 128, 0.8); }
+            33% { box-shadow: inset 0 0 70px rgba(255, 230, 0, 0.8); }
+            66% { box-shadow: inset 0 0 70px rgba(0, 255, 255, 0.8); }
+            100% { box-shadow: inset 0 0 70px rgba(255, 0, 128, 0.8); }
+        }
+
+        /* 集中線（スピードライン）エフェクト */
+        #speed-lines {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 4;
+            opacity: 0;
+            background: repeating-conic-gradient(
+                from 0deg,
+                transparent 0deg 4deg,
+                rgba(255, 255, 255, 0.22) 4.5deg 5.5deg,
+                transparent 6deg 10deg
+            );
+            -webkit-mask-image: radial-gradient(circle, transparent 38%, black 75%);
+            mask-image: radial-gradient(circle, transparent 38%, black 75%);
+            transition: opacity 0.1s ease;
+        }
+
+        /* 鬼コーチ怒りカットイン＆グリッチ演出 */
+        #rage-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 25;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, rgba(220, 38, 38, 0.35) 0%, rgba(127, 29, 29, 0.82) 100%);
+            opacity: 0;
+            transition: opacity 0.12s ease;
+        }
+        #rage-overlay.active {
+            opacity: 1;
+            animation: rageShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes rageShake {
+            0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+            15% { transform: translate3d(-14px, 8px, 0) scale(1.04) skewX(-3deg); }
+            30% { transform: translate3d(14px, -10px, 0) scale(1.03) skewX(3deg); }
+            45% { transform: translate3d(-12px, -6px, 0) scale(1.02) skewX(-2deg); }
+            60% { transform: translate3d(10px, 8px, 0) scale(1.01); }
+            75% { transform: translate3d(-6px, -4px, 0); }
+        }
+        .rage-banner-slap {
+            animation: slapIn 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.35) forwards;
+        }
+        @keyframes slapIn {
+            0% { transform: scale(2.2) rotate(-8deg); opacity: 0; }
+            70% { transform: scale(0.95) rotate(2deg); opacity: 1; }
+            100% { transform: scale(1) rotate(-1deg); opacity: 1; }
+        }
+
+        /* コーチのスマート戦術モニター（視界を塞がない上部配置） */
+        .command-pop {
+            animation: popIn 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.65); opacity: 0.2; }
+            75% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 判定テキストアニメーション */
+        .judge-pop {
+            animation: judgeAnim 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes judgeAnim {
+            0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+            25% { transform: translate(-50%, -60%) scale(1.3); opacity: 1; }
+            75% { transform: translate(-50%, -75%) scale(1.05); opacity: 1; }
+            100% { transform: translate(-50%, -105%) scale(0.9); opacity: 0; }
+        }
+
+        /* ネオンゲームボタン */
+        .game-btn {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.05s ease, box-shadow 0.08s ease, filter 0.08s ease;
+            backdrop-filter: blur(8px);
+        }
+        .game-btn:active, .game-btn.pressed {
+            transform: scale(0.91) translateY(3px);
+            filter: brightness(1.6);
+        }
+        .btn-guide-glow {
+            animation: guidePulse 0.4s infinite alternate;
+            border-width: 3px !important;
+        }
+        @keyframes guidePulse {
+            from { box-shadow: 0 0 12px currentColor, inset 0 0 10px currentColor; transform: scale(1); }
+            to { box-shadow: 0 0 30px currentColor, inset 0 0 22px currentColor; transform: scale(1.04); }
+        }
+
+        /* ジャンプボタンON状態（滞空中ハイライト） */
+        .jump-active-btn {
+            background: linear-gradient(to bottom, #fef08a, #f59e0b) !important;
+            border-color: #ffffff !important;
+            box-shadow: 0 0 35px #facc15, inset 0 0 18px #ffffff !important;
+            transform: scale(1.06);
+        }
+
+        /* スキャンライン背景 */
+        .scanlines {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.18) 50%);
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3Dキャンバス -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- エフェクトオーバーレイ -->
+    <div id="speed-lines"></div>
+    <div id="screen-overlay" class="scanlines"></div>
+
+    <!-- 鬼コーチ激怒カットインオーバーレイ（ミス・お手つきジャンプ時に発動） -->
+    <div id="rage-overlay">
+        <div id="rage-card" class="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 bg-slate-950/95 border-4 border-red-500 rounded-3xl px-6 py-5 sm:px-10 sm:py-7 shadow-[0_0_80px_rgba(239,68,68,0.95)] max-w-2xl mx-4">
+            <!-- 鬼コーチSVGイラスト（炎＆怒りマーク＆鬼ツノ） -->
+            <div class="relative w-28 h-28 sm:w-36 sm:h-36 flex-shrink-0">
+                <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-[0_0_20px_rgba(239,68,68,0.9)]">
+                    <!-- 背後の怒りの炎 -->
+                    <path d="M100 10 C130 40, 185 55, 175 115 C195 140, 165 190, 100 190 C35 190, 5 140, 25 115 C15 55, 70 40, 100 10 Z" fill="#ef4444" opacity="0.85"/>
+                    <path d="M100 28 C122 52, 165 65, 158 115 C172 135, 150 178, 100 178 C50 178, 28 135, 42 115 C35 65, 78 52, 100 28 Z" fill="#f97316"/>
+                    <!-- 鬼のツノ -->
+                    <polygon points="48,68 25,18 72,52" fill="#facc15" stroke="#713f12" stroke-width="4"/>
+                    <polygon points="152,68 175,18 128,52" fill="#facc15" stroke="#713f12" stroke-width="4"/>
+                    <!-- 顔輪郭（真っ赤に激怒） -->
+                    <ellipse cx="100" cy="112" rx="56" ry="62" fill="#dc2626" stroke="#450a0a" stroke-width="5"/>
+                    <!-- 逆立つ剛毛 -->
+                    <path d="M48 80 L55 52 L75 68 L100 44 L125 68 L145 52 L152 80 Z" fill="#1e1b4b"/>
+                    <!-- 怒り血管マーク -->
+                    <path d="M132 62 L138 70 L146 64 M130 74 L138 72 L142 80" stroke="#fef08a" stroke-width="4" fill="none" stroke-linecap="round"/>
+                    <!-- 極太つり眉 -->
+                    <polygon points="52,82 94,100 90,110 48,94" fill="#09090b"/>
+                    <polygon points="148,82 106,100 110,110 152,94" fill="#09090b"/>
+                    <!-- 燃える白目＆黄金の瞳 -->
+                    <ellipse cx="74" cy="108" rx="14" ry="10" fill="#ffffff"/>
+                    <circle cx="76" cy="108" r="5" fill="#facc15"/>
+                    <ellipse cx="126" cy="108" rx="14" ry="10" fill="#ffffff"/>
+                    <circle cx="124" cy="108" r="5" fill="#facc15"/>
+                    <!-- 激怒の絶叫口 -->
+                    <path d="M62 145 Q100 120 138 145 Q128 172 100 172 Q72 172 62 145 Z" fill="#450a0a" stroke="#09090b" stroke-width="4"/>
+                    <!-- ギザギザの歯 -->
+                    <polygon points="70,144 78,153 86,143 94,153 102,143 110,153 118,143 126,153 132,144" fill="#ffffff"/>
+                </svg>
+            </div>
+
+            <!-- 怒号テキスト -->
+            <div class="text-center sm:text-left">
+                <div class="inline-block bg-red-600 text-yellow-200 font-black text-xs sm:text-sm px-3 py-0.5 rounded-full tracking-widest mb-1.5 border border-yellow-300">
+                    ⚡ 鬼コーチ激怒指導 ⚡
+                </div>
+                <div id="rage-quote" class="font-impact text-2xl sm:text-4xl text-white tracking-wider leading-tight drop-shadow-[0_4px_10px_rgba(239,68,68,1)]">
+                    なにやってんだァァ！！
+                </div>
+                <div id="rage-reason" class="mt-2 font-bold text-sm sm:text-base text-amber-300 bg-black/60 px-3 py-1 rounded-xl border border-red-500/50 inline-block">
+                    ミス理由
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD & コントロールUI -->
+    <div id="ui-layer" class="fixed inset-0 z-10 flex flex-col justify-between pointer-events-none p-2.5 sm:p-4">
+        
+        <!-- 上部エリア：スコア・ジャンプボタン・コーチのスマート戦術モニター -->
+        <div class="w-full flex flex-col items-center">
+            <div class="w-full flex items-start justify-between gap-2 relative">
+                <!-- 左上：スコア & スピード -->
+                <div class="bg-slate-950/80 border border-cyan-500/40 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.25)]">
+                    <div class="text-[10px] sm:text-xs text-cyan-400 font-bold tracking-wider">SCORE</div>
+                    <div id="score-display" class="font-cyber text-xl sm:text-3xl text-white tracking-wider leading-none">0</div>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] sm:text-xs text-pink-400 font-bold">SPEED</span>
+                        <span id="speed-display" class="font-cyber text-xs sm:text-sm text-amber-300">120 km/h</span>
+                    </div>
+                </div>
+
+                <!-- 画面上中央：ジャンプボタン -->
+                <div class="pointer-events-auto flex flex-col items-center">
+                    <button id="btn-jump" data-action="jump"
+                        class="game-btn w-36 sm:w-48 h-13 sm:h-15 py-1.5 rounded-2xl bg-gradient-to-b from-amber-400/90 to-orange-600/90 border-2 border-yellow-200 text-slate-950 shadow-[0_0_25px_rgba(251,191,36,0.65)] flex flex-col items-center justify-center cursor-pointer">
+                        <span class="font-impact text-base sm:text-xl tracking-wider leading-none">⚡ ジャンプ</span>
+                        <span class="text-[10px] sm:text-xs font-black bg-black/25 text-white px-2 py-0.5 rounded-full mt-0.5">SPACE / TAP</span>
+                    </button>
+                    <!-- プレイヤー状態インジケーター -->
+                    <div id="jump-status" class="mt-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wider bg-slate-900/85 text-slate-400 border border-slate-700 transition-all">
+                        GROUND
+                    </div>
+                </div>
+
+                <!-- 右上：ライフ & コンボ & ガイド切替 -->
+                <div class="flex flex-col items-end gap-1.5">
+                    <div class="bg-slate-950/80 border border-pink-500/40 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-md shadow-[0_0_20px_rgba(236,72,153,0.25)] text-right">
+                        <div id="lives-display" class="text-sm sm:text-xl tracking-widest leading-none">❤️❤️❤️</div>
+                        <div class="mt-1 flex items-baseline justify-end gap-1">
+                            <span id="combo-display" class="font-cyber text-xl sm:text-3xl text-yellow-300 leading-none">0</span>
+                            <span class="text-[10px] sm:text-xs font-black text-yellow-500">COMBO</span>
+                        </div>
+                    </div>
+                    <div class="pointer-events-auto flex gap-1.5">
+                        <button id="toggle-guide" class="bg-slate-900/85 hover:bg-slate-800 text-cyan-300 border border-cyan-500/50 rounded-xl px-2 py-1 text-[10px] sm:text-[11px] font-bold shadow cursor-pointer">
+                            ガイド: ON
+                        </button>
+                        <button id="toggle-sound" class="bg-slate-900/85 hover:bg-slate-800 text-emerald-300 border border-emerald-500/50 rounded-xl px-2 py-1 text-[10px] sm:text-[11px] font-bold shadow cursor-pointer">
+                            🔊 ON
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 【視界クリア設計】鬼コーチの戦術指示モニター（ジャンプボタン直下の上部エリアに集約し、コート中央を完全開放！） -->
+            <div id="command-container" class="mt-1.5 opacity-0 transform scale-95 transition-all duration-150 flex flex-col items-center">
+                <div id="command-box" class="bg-slate-950/85 backdrop-blur-md border-2 border-white rounded-2xl px-4 py-1.5 sm:px-7 sm:py-2 shadow-[0_0_25px_rgba(0,0,0,0.9)] flex items-center gap-3 sm:gap-4">
+                    <span class="bg-red-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg tracking-wider border border-red-300 flex-shrink-0">
+                        👹 指令
+                    </span>
+                    <div class="flex flex-col sm:flex-row sm:items-baseline sm:gap-3 text-left">
+                        <div id="command-text" class="font-impact text-xl sm:text-3xl text-white tracking-wider leading-none drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
+                            READY...
+                        </div>
+                        <div id="command-sub" class="text-[10px] sm:text-xs font-black text-amber-300 tracking-widest">
+                            WAITING
+                        </div>
+                    </div>
+                </div>
+
+                <!-- コンパクトタイミングバー -->
+                <div id="timing-bar-wrap" class="mt-1 w-52 sm:w-72 h-2 bg-slate-950/90 rounded-full border border-slate-600 overflow-hidden opacity-0 transition-opacity relative">
+                    <div class="absolute top-0 bottom-0 left-[68%] right-[8%] bg-gradient-to-r from-emerald-400/50 via-yellow-300/85 to-pink-500/50 border-x border-yellow-200"></div>
+                    <div id="timing-fill" class="h-full w-0 bg-gradient-to-r from-cyan-400 via-yellow-300 to-rose-500 rounded-full"></div>
+                </div>
+            </div>
+
+            <!-- ZONE 突入バナー -->
+            <div id="zone-banner" class="hidden mt-1 px-4 py-0.5 rounded-full bg-gradient-to-r from-pink-600 via-amber-400 to-cyan-500 text-slate-950 font-cyber text-[11px] sm:text-xs tracking-widest shadow-[0_0_20px_rgba(255,215,0,0.9)] animate-bounce">
+                ★ DOPAMINE ZONE x2.0 ★
+            </div>
+        </div>
+
+        <!-- 中央エリア：シャトルの3D軌道が100%丸見え！（判定ポップアップのみ一瞬表示） -->
+        <div class="relative flex-1 flex items-center justify-center pointer-events-none">
+            <div id="judge-display" class="absolute top-[58%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-0 font-impact text-3xl sm:text-6xl whitespace-nowrap drop-shadow-[0_4px_16px_rgba(0,0,0,1)]">
+                GODLIKE!!
+            </div>
+        </div>
+
+        <!-- 下部エリア：4方向ショットボタン（指定レイアウト厳守） -->
+        <div class="w-full max-w-4xl mx-auto grid grid-cols-3 gap-2 sm:gap-4 items-center pb-1 sm:pb-2 pointer-events-auto">
+            
+            <!-- 画面下左：←左ドロップ -->
+            <div class="flex justify-start sm:justify-center">
+                <button id="btn-left" data-action="left"
+                    class="game-btn w-full h-22 sm:h-26 py-3 rounded-3xl bg-gradient-to-br from-emerald-500/85 to-teal-700/90 border-2 border-emerald-300 text-white shadow-[0_0_25px_rgba(16,185,129,0.5)] flex flex-col items-center justify-center p-2 cursor-pointer">
+                    <span class="font-impact text-base sm:text-2xl leading-tight text-center drop-shadow">←左ドロップ</span>
+                    <span class="text-[10px] sm:text-xs font-black bg-black/35 text-emerald-200 px-2.5 py-0.5 rounded-full mt-1">A / ←</span>
+                </button>
+            </div>
+
+            <!-- 画面下中央：上「クリア」・下「スマッシュ」 -->
+            <div class="flex flex-col gap-2">
+                <!-- 画面下中央上：クリア -->
+                <button id="btn-clear" data-action="clear"
+                    class="game-btn w-full h-13 sm:h-15 py-1.5 rounded-2xl bg-gradient-to-b from-sky-400/90 to-blue-700/90 border-2 border-sky-200 text-white shadow-[0_0_25px_rgba(56,189,248,0.55)] flex flex-col items-center justify-center px-2 cursor-pointer">
+                    <span class="font-impact text-sm sm:text-xl leading-none drop-shadow">▲ クリア</span>
+                    <span class="text-[10px] sm:text-xs font-black bg-black/35 text-sky-100 px-2 py-0.5 rounded-full mt-0.5">W / ↑</span>
+                </button>
+
+                <!-- 画面下中央下：スマッシュ -->
+                <button id="btn-smash" data-action="smash"
+                    class="game-btn w-full h-13 sm:h-15 py-1.5 rounded-2xl bg-gradient-to-b from-rose-500/95 to-red-800/95 border-2 border-rose-200 text-white shadow-[0_0_28px_rgba(244,63,94,0.65)] flex flex-col items-center justify-center px-2 cursor-pointer">
+                    <span class="font-impact text-sm sm:text-xl leading-none drop-shadow">🔥 スマッシュ</span>
+                    <span class="text-[10px] sm:text-xs font-black bg-black/35 text-rose-100 px-2 py-0.5 rounded-full mt-0.5">S / ↓</span>
+                </button>
+            </div>
+
+            <!-- 画面下右：右ドロップ→ -->
+            <div class="flex justify-end sm:justify-center">
+                <button id="btn-right" data-action="right"
+                    class="game-btn w-full h-22 sm:h-26 py-3 rounded-3xl bg-gradient-to-bl from-purple-500/85 to-indigo-800/90 border-2 border-purple-300 text-white shadow-[0_0_25px_rgba(168,85,247,0.5)] flex flex-col items-center justify-center p-2 cursor-pointer">
+                    <span class="font-impact text-base sm:text-2xl leading-tight text-center drop-shadow">右ドロップ→</span>
+                    <span class="text-[10px] sm:text-xs font-black bg-black/35 text-purple-200 px-2.5 py-0.5 rounded-full mt-1">D / →</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- スタート画面 / リザルト画面モーダル -->
+    <div id="modal-screen" class="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="max-w-lg w-full bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-cyan-400/60 rounded-3xl p-6 sm:p-8 text-center shadow-[0_0_60px_rgba(6,182,212,0.4)] relative overflow-hidden">
+            
+            <div class="absolute -top-24 -left-24 w-48 h-48 bg-pink-600/30 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/30 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- タイトルビュー -->
+            <div id="start-view">
+                <div class="inline-block px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400 text-amber-300 text-xs font-black tracking-widest mb-2">
+                    超感覚3Dバドミントン耐久アクション
+                </div>
+                <h1 class="font-impact text-4xl sm:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-yellow-300 to-pink-500 drop-shadow-[0_4px_15px_rgba(255,255,255,0.2)] mb-2">
+                    ドパミントン
+                </h1>
+                <p class="font-cyber text-sm sm:text-base text-cyan-400 tracking-[0.25em] mb-5">DOPAMINTON 3D</p>
+
+                <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-4 text-left text-xs sm:text-sm text-slate-200 space-y-2 mb-6">
+                    <p class="font-bold text-amber-300">🔥 広大なアリーナで鬼コーチのノックに食らいつけ！</p>
+                    <p>1. 画面上部の戦術モニターとボイスで<span class="text-white font-bold">8種類の指令</span>を確認！</p>
+                    <p>2. <span class="text-yellow-300 font-bold">「ジャンプ〇〇」</span>は<span class="text-amber-400 font-bold">[ジャンプ (Space)]</span>を押してから打て！</p>
+                    <p>3. <span class="text-rose-400 font-bold">⚠ ジャンプ指示がない時に跳ぶとお手つきで即ミス！</span></p>
+                    <div class="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
+                        <div>▲ クリア：<span class="text-sky-400 font-bold">W / ↑</span></div>
+                        <div>🔥 スマッシュ：<span class="text-rose-400 font-bold">S / ↓</span></div>
+                        <div>← 左ドロップ：<span class="text-emerald-400 font-bold">A / ←</span></div>
+                        <div>右ドロップ →：<span class="text-purple-400 font-bold">D / →</span></div>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-400 via-emerald-400 to-yellow-400 hover:brightness-110 active:scale-95 text-slate-950 font-impact text-2xl sm:text-3xl tracking-wider shadow-[0_0_35px_rgba(52,211,153,0.7)] transition-all cursor-pointer">
+                    PLAY START!!
+                </button>
+            </div>
+
+            <!-- リザルトビュー -->
+            <div id="result-view" class="hidden">
+                <div class="text-rose-500 font-impact text-2xl sm:text-3xl tracking-wider mb-1">KNOCK OUT!!</div>
+                <p id="result-coach-msg" class="text-slate-300 text-xs sm:text-sm mb-4">鬼コーチ「まだまだ甘いな！もう1セットだ！」</p>
+
+                <div class="my-3">
+                    <div class="text-xs text-slate-400 font-bold">DOPAMINE RANK</div>
+                    <div id="result-rank" class="font-cyber text-7xl sm:text-8xl text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-amber-400 to-rose-500 drop-shadow-[0_0_25px_rgba(251,191,36,0.8)] leading-none my-1">
+                        SSS
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-900/90 border border-slate-700 rounded-2xl p-3 sm:p-4 mb-6">
+                    <div>
+                        <div class="text-[10px] text-cyan-400 font-bold">TOTAL SCORE</div>
+                        <div id="result-score" class="font-cyber text-base sm:text-xl text-white">0</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-yellow-400 font-bold">MAX COMBO</div>
+                        <div id="result-combo" class="font-cyber text-base sm:text-xl text-yellow-300">0</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-rose-400 font-bold">SMASHES</div>
+                        <div id="result-smash" class="font-cyber text-base sm:text-xl text-rose-400">0</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-pink-400 font-bold">MAX SPEED</div>
+                        <div id="result-speed" class="font-cyber text-base sm:text-xl text-pink-300">0 km/h</div>
+                    </div>
+                </div>
+
+                <button id="retry-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-500 via-amber-400 to-cyan-400 hover:brightness-110 active:scale-95 text-slate-950 font-impact text-2xl sm:text-3xl tracking-wider shadow-[0_0_35px_rgba(244,63,94,0.7)] transition-all cursor-pointer">
+                    もう1回ブチ上げる！
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * ドパミントン (DOPAMINTON) - コアゲームエンジン (完全単一ファイル・エラー修正版)
+         * ============================================================================
+         */
+
+        // --- 8種類の指示マスターデータ ---
+        const COMMANDS = [
+            { id: 'clear',      label: '▲ クリア',              voice: 'クリア！',             shot: 'clear', jump: false, color: '#38bdf8', sub: 'HIGH CLEAR' },
+            { id: 'right',      label: '右ドロップ→',          voice: '右ドロップ！',         shot: 'right', jump: false, color: '#c084fc', sub: 'RIGHT DROP' },
+            { id: 'left',       label: '←左ドロップ',          voice: '左ドロップ！',         shot: 'left',  jump: false, color: '#34d399', sub: 'LEFT DROP' },
+            { id: 'smash',      label: '🔥 スマッシュ',        voice: 'スマッシュ！',         shot: 'smash', jump: false, color: '#fb7185', sub: 'POWER SMASH' },
+            { id: 'j_clear',    label: '⚡ジャンプクリア',     voice: 'ジャンプクリア！',     shot: 'clear', jump: true,  color: '#38bdf8', sub: 'JUMP + CLEAR' },
+            { id: 'j_right',    label: '⚡ジャンプ右ドロップ→', voice: 'ジャンプ右ドロップ！', shot: 'right', jump: true,  color: '#c084fc', sub: 'JUMP + RIGHT' },
+            { id: 'j_left',     label: '⚡←ジャンプ左ドロップ', voice: 'ジャンプ左ドロップ！', shot: 'left',  jump: true,  color: '#34d399', sub: 'JUMP + LEFT' },
+            { id: 'j_smash',    label: '⚡🔥ジャンプスマッシュ', voice: 'ジャンプスマッシュ！', shot: 'smash', jump: true,  color: '#facc15', sub: 'MAX JUMP SMASH!!' }
+        ];
+
+        // --- 通常ミス時の鬼コーチ激怒セリフ集 ---
+        const RAGE_QUOTES = [
+            { text: 'なにやってんだァァ！！', voice: 'なにやってんだァァ！！' },
+            { text: '足が止まってるぞォ！！', voice: '足が止まってるぞォ！！' },
+            { text: '気合を入れ直せェェ！！', voice: '気合を入れ直せェェ！！' },
+            { text: 'どこに打ってんだァ！！', voice: 'どこに打ってんだァ！！' },
+            { text: 'シャトルをよく見ろォ！！', voice: 'シャトルをよく見ろォ！！' },
+            { text: 'そんなんじゃ勝てんぞォ！！', voice: 'そんなんじゃ勝てんぞォ！！' }
+        ];
+
+        // --- 不要ジャンプ（お手つき）専用の鬼コーチ激怒セリフ集 ---
+        const FALSE_JUMP_RAGE_QUOTES = [
+            { text: '跳ぶなと言ったろうがァァ！！', voice: '跳ぶなと言ったろうがァァ！！' },
+            { text: '勝手に跳ぶなバカヤロォォ！！', voice: '勝手に跳ぶなバカヤロォォ！！' },
+            { text: '落ち着け！ジャンプ指示はないぞォ！！', voice: '落ち着け！ジャンプ指示はないぞォ！！' },
+            { text: 'フライングジャンプするなァァ！！', voice: 'フライングジャンプするなァァ！！' }
+        ];
+
+        // --- ゲーム状態管理 ---
+        const state = {
+            isPlaying: false,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            smashCount: 0,
+            lives: 3,
+            rallyCount: 0,
+            currentSpeedKmh: 120,
+            maxSpeedKmh: 120,
+            isZone: false,
+            guideEnabled: true,
+            soundEnabled: true,
+
+            // プレイヤー状態
+            isJumping: false,
+            jumpTimer: 0,
+            jumpDuration: 1.05,
+            playerY: 0,
+            racketSwingTimer: 0,
+            racketTargetX: 0,
+
+            // シャトル状態
+            shuttleActive: false,
+            shuttleState: 'idle', // 'incoming' | 'returning' | 'missed'
+            currentCmd: null,
+            flightProgress: 0,
+            flightDuration: 1.75,
+            nextServeDelay: 0,
+            missPauseTimer: 0, // ミス時の完全一時停止タイマー
+            hitStopTimer: 0,
+            cameraShake: 0,
+            cameraZoomPunch: 0,
+
+            // 返球軌道用パラメータ
+            returnStart: new THREE.Vector3(),
+            returnEnd: new THREE.Vector3(),
+            returnArcHeight: 4,
+            returnProgress: 0,
+            returnIsSmash: false,
+            returnIsJumpSmash: false
+        };
+
+        // --- DOM要素キャッシュ ---
+        const dom = {
+            canvas: document.getElementById('game-canvas'),
+            overlay: document.getElementById('screen-overlay'),
+            speedLines: document.getElementById('speed-lines'),
+            rageOverlay: document.getElementById('rage-overlay'),
+            rageCard: document.getElementById('rage-card'),
+            rageQuote: document.getElementById('rage-quote'),
+            rageReason: document.getElementById('rage-reason'),
+            score: document.getElementById('score-display'),
+            speed: document.getElementById('speed-display'),
+            lives: document.getElementById('lives-display'),
+            combo: document.getElementById('combo-display'),
+            zoneBanner: document.getElementById('zone-banner'),
+            cmdContainer: document.getElementById('command-container'),
+            cmdBox: document.getElementById('command-box'),
+            cmdText: document.getElementById('command-text'),
+            cmdSub: document.getElementById('command-sub'),
+            timingWrap: document.getElementById('timing-bar-wrap'),
+            timingFill: document.getElementById('timing-fill'),
+            judge: document.getElementById('judge-display'),
+            jumpStatus: document.getElementById('jump-status'),
+            btnJump: document.getElementById('btn-jump'),
+            btnClear: document.getElementById('btn-clear'),
+            btnSmash: document.getElementById('btn-smash'),
+            btnLeft: document.getElementById('btn-left'),
+            btnRight: document.getElementById('btn-right'),
+            toggleGuide: document.getElementById('toggle-guide'),
+            toggleSound: document.getElementById('toggle-sound'),
+            modal: document.getElementById('modal-screen'),
+            startView: document.getElementById('start-view'),
+            resultView: document.getElementById('result-view'),
+            startBtn: document.getElementById('start-btn'),
+            retryBtn: document.getElementById('retry-btn'),
+            resScore: document.getElementById('result-score'),
+            resCombo: document.getElementById('result-combo'),
+            resSmash: document.getElementById('result-smash'),
+            resSpeed: document.getElementById('result-speed'),
+            resRank: document.getElementById('result-rank'),
+            resCoachMsg: document.getElementById('result-coach-msg')
+        };
+
+        /**
+         * ============================================================================
+         * Web Audio API ドーパミン・シンセ＆ボイスエンジン
+         * ============================================================================
+         */
+        class DopamineAudio {
+            constructor() {
+                this.ctx = null;
+                this.bgmTimer = null;
+                this.beatStep = 0;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // 鬼コーチ音声合成
+            speak(text, rate = 1.45, pitch = 0.85) {
+                if (!state.soundEnabled || !('speechSynthesis' in window)) return;
+                try {
+                    window.speechSynthesis.cancel();
+                    const uttr = new SpeechSynthesisUtterance(text);
+                    uttr.lang = 'ja-JP';
+                    uttr.rate = rate;
+                    uttr.pitch = pitch;
+                    uttr.volume = 1.0;
+                    window.speechSynthesis.speak(uttr);
+                } catch (e) {
+                    // 音声合成非対応環境では無視
+                }
+            }
+
+            playTone(freq, type, duration, gainVal = 0.25, slideFreq = null) {
+                if (!state.soundEnabled || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+                if (slideFreq) {
+                    osc.frequency.exponentialRampToValueAtTime(slideFreq, now + duration);
+                }
+                gain.gain.setValueAtTime(gainVal, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + duration);
+            }
+
+            playJump() {
+                this.playTone(260, 'sine', 0.22, 0.3, 680);
+                this.playTone(520, 'triangle', 0.15, 0.15, 980);
+            }
+
+            playServe() {
+                this.playTone(180, 'triangle', 0.12, 0.2, 420);
+            }
+
+            // ヒット音（スマッシュ時は超重低音サブベース＋電撃轟音）
+            playHit(combo, isSmash, isJumpSmash, isPerfect) {
+                if (!state.soundEnabled || !this.ctx) return;
+                const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+                const noteFreq = scale[combo % scale.length] * (1 + Math.floor(combo / 11) * 0.25);
+
+                if (isSmash) {
+                    this.playTone(130, 'sawtooth', 0.35, 0.55, 28);
+                    this.playTone(75, 'sine', 0.45, 0.65, 22);
+                    this.playTone(1200, 'square', 0.18, 0.35, 190);
+                    this.playTone(noteFreq * 1.5, 'triangle', 0.38, 0.4);
+                    if (isJumpSmash) {
+                        setTimeout(() => {
+                            this.playTone(1046.5, 'sine', 0.35, 0.35, 2093);
+                            this.playTone(1567.98, 'triangle', 0.35, 0.3, 3135);
+                        }, 45);
+                    }
+                } else {
+                    this.playTone(noteFreq, 'triangle', 0.22, 0.32);
+                    this.playTone(noteFreq * 1.5, 'sine', 0.18, 0.18);
+                }
+
+                if (isPerfect) {
+                    setTimeout(() => this.playTone(noteFreq * 2, 'sine', 0.25, 0.25), 55);
+                }
+            }
+
+            playZoneEnter() {
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                notes.forEach((f, idx) => {
+                    setTimeout(() => this.playTone(f, 'sawtooth', 0.28, 0.22), idx * 55);
+                });
+            }
+
+            // ミス時の雷鳴＆鬼ブザー音
+            playRageThunder() {
+                this.playTone(130, 'sawtooth', 0.55, 0.55, 32);
+                this.playTone(123, 'square', 0.55, 0.45, 30);
+                this.playTone(880, 'sawtooth', 0.15, 0.35, 110);
+            }
+
+            startBgm() {
+                this.stopBgm();
+                this.beatStep = 0;
+                const tick = () => {
+                    if (!state.isPlaying) return;
+                    if (state.soundEnabled && this.ctx && state.missPauseTimer <= 0) {
+                        const bassNotes = [65.41, 65.41, 77.78, 87.31, 98.00, 98.00, 116.54, 87.31];
+                        const freq = bassNotes[this.beatStep % bassNotes.length] * (state.isZone ? 1.5 : 1.0);
+                        this.playTone(freq, state.isZone ? 'sawtooth' : 'triangle', 0.14, 0.11);
+
+                        if (this.beatStep % 2 === 1) {
+                            this.playTone(state.isZone ? 4800 : 3200, 'sine', 0.03, 0.04);
+                        }
+                        if (state.isZone && this.beatStep % 4 === 0) {
+                            this.playTone(freq * 4, 'sine', 0.18, 0.09);
+                        }
+                    }
+                    this.beatStep++;
+                    const bpm = Math.min(185, 128 + state.combo * 1.4);
+                    const interval = (60 / bpm / 2) * 1000;
+                    this.bgmTimer = setTimeout(tick, interval);
+                };
+                tick();
+            }
+
+            stopBgm() {
+                if (this.bgmTimer) {
+                    clearTimeout(this.bgmTimer);
+                    this.bgmTimer = null;
+                }
+            }
+        }
+
+        const audio = new DopamineAudio();
+
+        /**
+         * ============================================================================
+         * Three.js ワイド＆ダイナミック3Dアリーナ構築
+         * ============================================================================
+         */
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050614);
+        scene.fog = new THREE.FogExp2(0x050614, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 150);
+        const baseCamPos = new THREE.Vector3(0, 6.4, 15.8);
+        camera.position.copy(baseCamPos);
+        camera.lookAt(0, 1.3, -2.5);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: dom.canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // 照明システム
+        const ambientLight = new THREE.AmbientLight(0x88aaff, 0.9);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+        dirLight.position.set(10, 22, 14);
+        scene.add(dirLight);
+
+        const pointLightLeft = new THREE.PointLight(0x00ffff, 2.2, 42);
+        pointLightLeft.position.set(-12, 8, -4);
+        scene.add(pointLightLeft);
+
+        const pointLightRight = new THREE.PointLight(0xff00aa, 2.2, 42);
+        pointLightRight.position.set(12, 8, -4);
+        scene.add(pointLightRight);
+
+        // --- 広大なバドミントンコート構築 (幅11m × 長さ22m + 周囲ランオフ) ---
+        const COURT_W = 11.0;
+        const COURT_L = 22.0;
+        const HIT_ZONE_Z = 9.0;
+        const COACH_Z = -9.5;
+
+        // アリーナ全体フロア（深いダークネイビー）
+        const arenaFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(60, 70),
+            new THREE.MeshStandardMaterial({ color: 0x070a18, roughness: 0.75 })
+        );
+        arenaFloor.rotation.x = -Math.PI / 2;
+        arenaFloor.position.y = -0.02;
+        scene.add(arenaFloor);
+
+        // 国際大会仕様レッドカーペット・ランオフエリア
+        const runoffFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(COURT_W + 4.4, COURT_L + 4.4),
+            new THREE.MeshStandardMaterial({ color: 0x3b0d26, roughness: 0.55, metalness: 0.1 })
+        );
+        runoffFloor.rotation.x = -Math.PI / 2;
+        runoffFloor.position.y = -0.008;
+        scene.add(runoffFloor);
+
+        // メインコート床（視認性抜群のディープエメラルドグリーン）
+        const courtMat = new THREE.MeshStandardMaterial({
+            color: 0x064e3b,
+            roughness: 0.38,
+            metalness: 0.15
+        });
+        const courtMesh = new THREE.Mesh(new THREE.PlaneGeometry(COURT_W, COURT_L), courtMat);
+        courtMesh.rotation.x = -Math.PI / 2;
+        scene.add(courtMesh);
+
+        // ヒット時の発光パネル（コート全体が脈動）
+        const courtGlowMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.0
+        });
+        const courtGlowMesh = new THREE.Mesh(new THREE.PlaneGeometry(COURT_W, COURT_L), courtGlowMat);
+        courtGlowMesh.rotation.x = -Math.PI / 2;
+        courtGlowMesh.position.y = 0.012;
+        scene.add(courtGlowMesh);
+
+        // 白線ライン群（ダブルス・シングルス・サービスライン完全再現）
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+        function addLine(w, d, x, z, mat = lineMat) {
+            const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+            m.rotation.x = -Math.PI / 2;
+            m.position.set(x, 0.02, z);
+            scene.add(m);
+        }
+        // 外枠（ダブルスサイド＆バックバウンダリー）
+        addLine(COURT_W, 0.12, 0, -COURT_L / 2);
+        addLine(COURT_W, 0.12, 0, COURT_L / 2);
+        addLine(0.12, COURT_L, -COURT_W / 2, 0);
+        addLine(0.12, COURT_L, COURT_W / 2, 0);
+        // シングルスサイドライン
+        addLine(0.1, COURT_L, -COURT_W / 2 + 0.85, 0);
+        addLine(0.1, COURT_L, COURT_W / 2 - 0.85, 0);
+        // ロングサービスライン（ダブルス用）
+        addLine(COURT_W, 0.1, 0, -COURT_L / 2 + 1.3);
+        addLine(COURT_W, 0.1, 0, COURT_L / 2 - 1.3);
+        // ショートサービスライン
+        addLine(COURT_W, 0.1, 0, -3.2);
+        addLine(COURT_W, 0.1, 0, 3.2);
+        // センターライン
+        addLine(0.1, 7.8, 0, -7.1);
+        addLine(0.1, 7.8, 0, 7.1);
+
+        // ターゲット打点ゾーンライン（手前側）
+        const targetZoneMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.7 });
+        addLine(COURT_W - 0.4, 0.22, 0, HIT_ZONE_Z, targetZoneMat);
+
+        // --- アリーナ観客席＆ネオンアーチ（広大さとスピード感を強調） ---
+        const standMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 });
+        const neonStripMatCyan = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+        const neonStripMatPink = new THREE.MeshBasicMaterial({ color: 0xec4899 });
+
+        [-1, 1].forEach(side => {
+            // 左右スタンド段差
+            for (let tier = 0; tier < 3; tier++) {
+                const stand = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2 + tier * 1.1, 32), standMat);
+                stand.position.set(side * (10.5 + tier * 2.1), (1.2 + tier * 1.1) / 2, -2);
+                scene.add(stand);
+
+                const strip = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.12, 0.14, 32),
+                    side < 0 ? neonStripMatCyan : neonStripMatPink
+                );
+                strip.position.set(side * (9.4 + tier * 2.1), 1.15 + tier * 1.1, -2);
+                scene.add(strip);
+            }
+        });
+
+        // ネット＆ポール（ワイドコート対応）
+        const netGroup = new THREE.Group();
+        const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 2.35, 16);
+        const postMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.6 });
+        const leftPost = new THREE.Mesh(postGeo, postMat);
+        leftPost.position.set(-COURT_W / 2 - 0.15, 1.175, 0);
+        const rightPost = new THREE.Mesh(postGeo, postMat);
+        rightPost.position.set(COURT_W / 2 + 0.15, 1.175, 0);
+        netGroup.add(leftPost, rightPost);
+
+        const netMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(COURT_W + 0.3, 1.1, 28, 6),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.42 })
+        );
+        netMesh.position.set(0, 1.65, 0);
+        netGroup.add(netMesh);
+
+        const netTopTape = new THREE.Mesh(
+            new THREE.BoxGeometry(COURT_W + 0.3, 0.11, 0.08),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        netTopTape.position.set(0, 2.2, 0);
+        netGroup.add(netTopTape);
+        scene.add(netGroup);
+
+        // --- 鬼コーチ（奥側：巨大オーラ仕様） ---
+        const coachGroup = new THREE.Group();
+        coachGroup.position.set(0, 0, COACH_Z);
+
+        const coachBody = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.55, 0.72, 2.1, 16),
+            new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: 0x991b1b, emissiveIntensity: 0.65 })
+        );
+        coachBody.position.y = 1.05;
+        coachGroup.add(coachBody);
+
+        const coachHead = new THREE.Mesh(
+            new THREE.SphereGeometry(0.48, 16, 16),
+            new THREE.MeshStandardMaterial({ color: 0xfdba74 })
+        );
+        coachHead.position.y = 2.4;
+        coachGroup.add(coachHead);
+
+        // 鬼のツノ（3Dモデルにも装備！）
+        const hornGeo = new THREE.ConeGeometry(0.11, 0.42, 8);
+        const hornMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.5 });
+        const hornL = new THREE.Mesh(hornGeo, hornMat);
+        hornL.position.set(-0.26, 2.85, 0.05);
+        hornL.rotation.z = 0.35;
+        const hornR = new THREE.Mesh(hornGeo, hornMat);
+        hornR.position.set(0.26, 2.85, 0.05);
+        hornR.rotation.z = -0.35;
+        coachGroup.add(hornL, hornR);
+
+        const visor = new THREE.Mesh(
+            new THREE.BoxGeometry(0.65, 0.16, 0.35),
+            new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        visor.position.set(0, 2.45, 0.35);
+        coachGroup.add(visor);
+
+        const coachAura = new THREE.Mesh(
+            new THREE.RingGeometry(1.0, 1.55, 32),
+            new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
+        );
+        coachAura.rotation.x = -Math.PI / 2;
+        coachAura.position.y = 0.05;
+        coachGroup.add(coachAura);
+        scene.add(coachGroup);
+
+        // --- プレイヤーラケット（手前側） ---
+        const racketGroup = new THREE.Group();
+        racketGroup.position.set(0, 1.3, HIT_ZONE_Z + 0.85);
+
+        const handleMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.06, 0.95, 12),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b })
+        );
+        handleMesh.position.y = -0.65;
+        racketGroup.add(handleMesh);
+
+        const frameMesh = new THREE.Mesh(
+            new THREE.TorusGeometry(0.55, 0.055, 12, 32),
+            new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.9 })
+        );
+        frameMesh.scale.set(0.84, 1.22, 1);
+        frameMesh.position.y = 0.45;
+        racketGroup.add(frameMesh);
+
+        const gutMesh = new THREE.Mesh(
+            new THREE.CircleGeometry(0.52, 24),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.55 })
+        );
+        gutMesh.scale.set(0.84, 1.22, 1);
+        gutMesh.position.y = 0.45;
+        racketGroup.add(gutMesh);
+        scene.add(racketGroup);
+
+        // --- 高視認性3Dシャトルコック＆床着弾予測リング ---
+        const shuttleGroup = new THREE.Group();
+        const corkMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.25, 16, 16),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfef08a, emissiveIntensity: 0.85 })
+        );
+        shuttleGroup.add(corkMesh);
+
+        const skirtMesh = new THREE.Mesh(
+            new THREE.ConeGeometry(0.46, 0.72, 16, 1, true),
+            new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.75, side: THREE.DoubleSide })
+        );
+        skirtMesh.position.z = -0.4;
+        skirtMesh.rotation.x = Math.PI / 2;
+        shuttleGroup.add(skirtMesh);
+
+        // シャトル外周の発光ハロー（遠くからでもハッキリ見える！）
+        const shuttleHalo = new THREE.Mesh(
+            new THREE.SphereGeometry(0.55, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.25 })
+        );
+        shuttleGroup.add(shuttleHalo);
+        shuttleGroup.visible = false;
+        scene.add(shuttleGroup);
+
+        // シャトル真下の床に投影される着弾予測ターゲットリング
+        const floorDropMarker = new THREE.Mesh(
+            new THREE.RingGeometry(0.35, 0.65, 24),
+            new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+        );
+        floorDropMarker.rotation.x = -Math.PI / 2;
+        floorDropMarker.position.y = 0.04;
+        floorDropMarker.visible = false;
+        scene.add(floorDropMarker);
+
+        // --- シャトルの光の軌跡（ネオントレイル） ---
+        const TRAIL_COUNT = 26;
+        const trailMeshes = [];
+        for (let i = 0; i < TRAIL_COUNT; i++) {
+            const tMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.3 * (1 - i / TRAIL_COUNT), 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0 })
+            );
+            scene.add(tMesh);
+            trailMeshes.push(tMesh);
+        }
+        const trailHistory = [];
+
+        function updateTrail(pos, colorHex, scaleMult = 1.0) {
+            trailHistory.unshift(pos.clone());
+            if (trailHistory.length > TRAIL_COUNT) trailHistory.pop();
+
+            for (let i = 0; i < TRAIL_COUNT; i++) {
+                if (i < trailHistory.length) {
+                    trailMeshes[i].position.copy(trailHistory[i]);
+                    trailMeshes[i].scale.setScalar(scaleMult);
+                    trailMeshes[i].material.color.setHex(colorHex);
+                    trailMeshes[i].material.opacity = (1 - i / TRAIL_COUNT) * 0.75;
+                    trailMeshes[i].visible = true;
+                } else {
+                    trailMeshes[i].visible = false;
+                }
+            }
+        }
+
+        function clearTrail() {
+            trailHistory.length = 0;
+            trailMeshes.forEach(m => m.visible = false);
+        }
+
+        // --- パーティクル＆衝撃波＆スマッシュプラズマ柱＆落雷エフェクトシステム ---
+        const particles = [];
+        const shockwaves = [];
+        const plasmaPillars = [];
+        const lightningBolts = [];
+
+        function spawnHitExplosion(pos, colorHex, count = 35, speedMult = 1.0) {
+            for (let i = 0; i < count; i++) {
+                const pMesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.2, 0.2),
+                    new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1 })
+                );
+                pMesh.position.copy(pos);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                const spd = (5 + Math.random() * 14) * speedMult;
+                const vel = new THREE.Vector3(
+                    Math.sin(phi) * Math.cos(theta) * spd,
+                    Math.abs(Math.cos(phi)) * spd + 3,
+                    Math.sin(phi) * Math.sin(theta) * spd
+                );
+                scene.add(pMesh);
+                particles.push({ mesh: pMesh, vel, life: 1.0, decay: 1.4 + Math.random() * 0.8 });
+            }
+
+            // 衝撃波リング
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.2, 0.7, 32),
+                new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: 0.95 })
+            );
+            ring.position.copy(pos);
+            ring.lookAt(camera.position);
+            scene.add(ring);
+            shockwaves.push({ mesh: ring, life: 1.0, expandSpeed: 18 * speedMult });
+        }
+
+        // 【スマッシュ着弾時の超ド派手プラズマ光の柱＆多重衝撃波】
+        function spawnSmashBeamImpact(pos, isJumpSmash) {
+            const beamColor = isJumpSmash ? 0xfacc15 : 0xf43f5e;
+            const subColor = isJumpSmash ? 0x38bdf8 : 0xfb923c;
+
+            // 垂直に天を貫くプラズマビーム柱
+            const pillarGeo = new THREE.CylinderGeometry(isJumpSmash ? 0.9 : 0.6, isJumpSmash ? 1.5 : 1.0, 26, 20, 1, true);
+            const pillarMat = new THREE.MeshBasicMaterial({
+                color: beamColor,
+                transparent: true,
+                opacity: 0.92,
+                side: THREE.DoubleSide
+            });
+            const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+            pillar.position.set(pos.x, 13, pos.z);
+            scene.add(pillar);
+            plasmaPillars.push({ mesh: pillar, life: 1.0 });
+
+            // 地面を走る多重衝撃波リング（3連）
+            [0, 1, 2].forEach(idx => {
+                const groundRing = new THREE.Mesh(
+                    new THREE.RingGeometry(0.3, 0.95, 36),
+                    new THREE.MeshBasicMaterial({
+                        color: idx % 2 === 0 ? beamColor : subColor,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.95
+                    })
+                );
+                groundRing.rotation.x = -Math.PI / 2;
+                groundRing.position.set(pos.x, 0.08 + idx * 0.04, pos.z);
+                scene.add(groundRing);
+                shockwaves.push({
+                    mesh: groundRing,
+                    life: 1.0,
+                    expandSpeed: (22 + idx * 9) * (isJumpSmash ? 1.35 : 1.0)
+                });
+            });
+
+            // 大量火花パーティクル
+            spawnHitExplosion(pos, beamColor, isJumpSmash ? 85 : 55, isJumpSmash ? 1.9 : 1.45);
+        }
+
+        // 【ミス時の3D落雷エフェクト】
+        function spawnLightningStrike(targetPos) {
+            const points = [];
+            const segments = 10;
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const y = 18 * (1 - t);
+                const jitter = i === segments ? 0 : (Math.random() - 0.5) * 1.8;
+                points.push(new THREE.Vector3(targetPos.x + jitter, y, targetPos.z + jitter));
+            }
+            const boltGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const boltMat = new THREE.LineBasicMaterial({ color: 0xfef08a, linewidth: 4 });
+            const boltLine = new THREE.Line(boltGeo, boltMat);
+            scene.add(boltLine);
+            lightningBolts.push({ mesh: boltLine, life: 1.0 });
+
+            // 落雷地点の赤い衝撃波
+            spawnHitExplosion(new THREE.Vector3(targetPos.x, 0.3, targetPos.z), 0xef4444, 45, 1.4);
+        }
+
+        // 背景の浮遊ネオンキューブ（スピード感演出）
+        const bgCubes = [];
+        for (let i = 0; i < 48; i++) {
+            const cube = new THREE.Mesh(
+                new THREE.OctahedronGeometry(0.24 + Math.random() * 0.4, 0),
+                new THREE.MeshBasicMaterial({
+                    color: i % 2 === 0 ? 0x06b6d4 : 0xec4899,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.38
+                })
+            );
+            cube.position.set(
+                (Math.random() - 0.5) * 38,
+                1.5 + Math.random() * 14,
+                -28 + Math.random() * 44
+            );
+            scene.add(cube);
+            bgCubes.push(cube);
+        }
+
+        /**
+         * ============================================================================
+         * ゲームロジック & アクション制御
+         * ============================================================================
+         */
+        function startGame() {
+            audio.init();
+
+            state.isPlaying = true;
+            state.score = 0;
+            state.combo = 0;
+            state.maxCombo = 0;
+            state.smashCount = 0;
+            state.lives = 3;
+            state.rallyCount = 0;
+            state.currentSpeedKmh = 120;
+            state.maxSpeedKmh = 120;
+            state.isZone = false;
+            state.isJumping = false;
+            state.jumpTimer = 0;
+            state.playerY = 0;
+            state.shuttleActive = false;
+            state.shuttleState = 'idle';
+            state.flightDuration = 1.75;
+            state.nextServeDelay = 0.55;
+            state.missPauseTimer = 0;
+
+            dom.modal.classList.add('hidden');
+            dom.rageOverlay.classList.remove('active');
+            dom.overlay.classList.remove('zone-active');
+            dom.zoneBanner.classList.add('hidden');
+            dom.speedLines.style.opacity = '0';
+            resetJumpVisualState();
+            updateHUD();
+            clearButtonGuides();
+            hideCommandUI();
+
+            audio.speak('いくぞ！一本目から気合入れろ！', 1.4, 0.85);
+            audio.startBgm();
+        }
+
+        function serveNextShuttle() {
+            if (!state.isPlaying) return;
+
+            let pool = COMMANDS;
+            if (state.rallyCount < 2) {
+                pool = COMMANDS.filter(c => !c.jump);
+            }
+            const cmd = pool[Math.floor(Math.random() * pool.length)];
+            state.currentCmd = cmd;
+            state.shuttleActive = true;
+            state.shuttleState = 'incoming';
+            state.flightProgress = 0;
+
+            // 耐久スピード上昇カーブ
+            state.flightDuration = Math.max(0.76, 1.75 * Math.pow(0.976, state.rallyCount));
+            state.currentSpeedKmh = Math.round(120 + state.rallyCount * 7.5 + (cmd.shot === 'smash' ? 45 : 0));
+            if (state.currentSpeedKmh > state.maxSpeedKmh) state.maxSpeedKmh = state.currentSpeedKmh;
+
+            // シャトル初期位置設定
+            shuttleGroup.visible = true;
+            shuttleGroup.position.set(0, 2.3, COACH_Z + 0.8);
+            floorDropMarker.visible = true;
+            floorDropMarker.position.set(0, 0.04, COACH_Z + 0.8);
+            clearTrail();
+
+            // シャトルカラー＆着弾リングカラーを指示に合わせて変化
+            const hexColor = parseInt(cmd.color.replace('#', '0x'));
+            skirtMesh.material.color.setHex(hexColor);
+            skirtMesh.material.emissive.setHex(hexColor);
+            shuttleHalo.material.color.setHex(hexColor);
+            floorDropMarker.material.color.setHex(hexColor);
+
+            // 鬼コーチジャンプ演出
+            coachBody.position.y = 1.4;
+            setTimeout(() => { coachBody.position.y = 1.05; }, 160);
+
+            // 指示モニター表示 & ボイス再生
+            showCommandUI(cmd);
+            updateButtonGuides(cmd);
+            audio.playServe();
+            audio.speak(cmd.voice, Math.min(1.85, 1.42 + state.rallyCount * 0.012), 0.85);
+            updateHUD();
+        }
+
+        function showCommandUI(cmd) {
+            dom.cmdText.textContent = cmd.label;
+            dom.cmdText.style.color = cmd.color;
+            dom.cmdSub.textContent = cmd.sub;
+            dom.cmdBox.style.borderColor = cmd.color;
+
+            dom.cmdContainer.classList.remove('opacity-0', 'scale-95', 'command-pop');
+            void dom.cmdContainer.offsetWidth;
+            dom.cmdContainer.classList.add('opacity-100', 'scale-100', 'command-pop');
+
+            dom.timingWrap.classList.remove('opacity-0');
+            dom.timingFill.style.width = '0%';
+        }
+
+        function hideCommandUI() {
+            dom.cmdContainer.classList.add('opacity-0', 'scale-95');
+            dom.cmdContainer.classList.remove('opacity-100', 'scale-100');
+            dom.timingWrap.classList.add('opacity-0');
+        }
+
+        function updateButtonGuides(cmd) {
+            clearButtonGuides();
+            if (!state.guideEnabled || !cmd) return;
+
+            if (cmd.jump) {
+                dom.btnJump.classList.add('btn-guide-glow');
+            }
+            const map = {
+                clear: dom.btnClear,
+                smash: dom.btnSmash,
+                left: dom.btnLeft,
+                right: dom.btnRight
+            };
+            if (map[cmd.shot]) {
+                map[cmd.shot].classList.add('btn-guide-glow');
+            }
+        }
+
+        function clearButtonGuides() {
+            [dom.btnJump, dom.btnClear, dom.btnSmash, dom.btnLeft, dom.btnRight].forEach(b => {
+                b.classList.remove('btn-guide-glow');
+            });
+        }
+
+        // 【厳格ジャンプ判定】必要ない時にジャンプしたら即ミス＆激怒演出！
+        function triggerJump() {
+            if (!state.isPlaying || state.missPauseTimer > 0) return;
+            flashButton(dom.btnJump);
+
+            // 指示が出ていない、または「ジャンプ不要」の指示のときに跳んだらお手つき即アウト！
+            if (!state.shuttleActive || state.shuttleState !== 'incoming' || !state.currentCmd || !state.currentCmd.jump) {
+                const reason = (!state.shuttleActive || !state.currentCmd)
+                    ? 'まだ球が出てないのに勝手に跳ぶな！'
+                    : `「${state.currentCmd.label}」にジャンプは不要だ！`;
+                triggerRageMiss(reason, true);
+                return;
+            }
+
+            // ジャンプ指示があるときだけ正常にジャンプ発動！
+            if (!state.isJumping) {
+                state.isJumping = true;
+                state.jumpTimer = state.jumpDuration;
+                audio.playJump();
+
+                dom.btnJump.classList.add('jump-active-btn');
+                dom.jumpStatus.textContent = '★ AIRBORNE ★';
+                dom.jumpStatus.className = 'mt-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wider bg-amber-400 text-slate-950 border border-white shadow-[0_0_15px_#facc15]';
+
+                spawnHitExplosion(new THREE.Vector3(racketGroup.position.x, 0.2, HIT_ZONE_Z + 0.8), 0xfacc15, 16, 0.7);
+            }
+        }
+
+        function resetJumpVisualState() {
+            state.isJumping = false;
+            state.jumpTimer = 0;
+            state.playerY = 0;
+            dom.btnJump.classList.remove('jump-active-btn');
+            dom.jumpStatus.textContent = 'GROUND';
+            dom.jumpStatus.className = 'mt-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wider bg-slate-900/85 text-slate-400 border border-slate-700 transition-all';
+        }
+
+        function triggerShot(shotType) {
+            if (!state.isPlaying || state.missPauseTimer > 0) return;
+
+            const btnMap = { clear: dom.btnClear, smash: dom.btnSmash, left: dom.btnLeft, right: dom.btnRight };
+            flashButton(btnMap[shotType]);
+
+            state.racketSwingTimer = 0.24;
+            if (shotType === 'left') state.racketTargetX = -2.8;
+            else if (shotType === 'right') state.racketTargetX = 2.8;
+            else state.racketTargetX = 0;
+
+            if (!state.shuttleActive || state.shuttleState !== 'incoming') {
+                return;
+            }
+
+            const cmd = state.currentCmd;
+            const p = state.flightProgress;
+
+            // 早すぎ空振り判定
+            if (p < 0.35) {
+                triggerRageMiss('早すぎる！シャトルを引きつけろ！');
+                return;
+            }
+
+            // ショット種類ミス判定
+            if (shotType !== cmd.shot) {
+                const shotNames = { clear: 'クリア', smash: 'スマッシュ', left: '左ドロップ', right: '右ドロップ' };
+                triggerRageMiss(`「${cmd.label}」なのに「${shotNames[shotType]}」を打った！`);
+                return;
+            }
+
+            // ジャンプ指示があるのに地上で打った判定
+            if (cmd.jump && !state.isJumping) {
+                triggerRageMiss(`「${cmd.label}」はジャンプして打て！`);
+                return;
+            }
+
+            // === ヒット成功！ ===
+            const isPerfect = (p >= 0.68 && p <= 0.94);
+            const isSmash = (shotType === 'smash');
+            const isJumpSmash = (isSmash && cmd.jump);
+
+            state.combo++;
+            if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+            state.rallyCount++;
+            if (isSmash) state.smashCount++;
+
+            if (!state.isZone && state.combo >= 10) {
+                state.isZone = true;
+                dom.overlay.classList.add('zone-active');
+                dom.zoneBanner.classList.remove('hidden');
+                audio.playZoneEnter();
+                showJudgePopup('★ DOPAMINE ZONE ★', '#facc15');
+            }
+
+            let basePts = 100;
+            if (isJumpSmash) basePts = 380;
+            else if (isSmash) basePts = 240;
+            else if (cmd.jump) basePts = 180;
+
+            if (isPerfect) basePts = Math.round(basePts * 1.5);
+            const comboMult = 1 + Math.floor(state.combo / 5) * 0.25;
+            const zoneMult = state.isZone ? 2.0 : 1.0;
+            const earned = Math.round(basePts * comboMult * zoneMult);
+            state.score += earned;
+
+            // === スマッシュ時の超ド派手演出強化 ===
+            if (isJumpSmash) {
+                state.hitStopTimer = 0.085;
+                state.cameraShake = 1.1;
+                state.cameraZoomPunch = 2.6;
+                dom.speedLines.style.opacity = '1';
+                setTimeout(() => { dom.speedLines.style.opacity = '0'; }, 360);
+            } else if (isSmash) {
+                state.hitStopTimer = 0.055;
+                state.cameraShake = 0.72;
+                state.cameraZoomPunch = 1.65;
+                dom.speedLines.style.opacity = '0.75';
+                setTimeout(() => { dom.speedLines.style.opacity = '0'; }, 260);
+            } else {
+                state.cameraShake = isPerfect ? 0.24 : 0.12;
+                state.cameraZoomPunch = isPerfect ? 0.45 : 0.15;
+            }
+
+            // 画面フラッシュ＆コート発光
+            const hexColor = parseInt(cmd.color.replace('#', '0x'));
+            courtGlowMesh.material.color.setHex(isJumpSmash ? 0xfacc15 : hexColor);
+            courtGlowMesh.material.opacity = isSmash ? 0.85 : 0.45;
+            dom.overlay.style.backgroundColor = isJumpSmash
+                ? 'rgba(250, 204, 21, 0.35)'
+                : (isSmash ? 'rgba(244, 63, 94, 0.28)' : 'rgba(255, 255, 255, 0.15)');
+            setTimeout(() => { dom.overlay.style.backgroundColor = 'transparent'; }, 100);
+
+            // 3D打点爆発エフェクト
+            spawnHitExplosion(
+                shuttleGroup.position,
+                isJumpSmash ? 0xfacc15 : hexColor,
+                isJumpSmash ? 70 : (isSmash ? 48 : 25),
+                isJumpSmash ? 1.8 : (isSmash ? 1.4 : 1.0)
+            );
+
+            // サウンド再生
+            audio.playHit(state.combo, isSmash, isJumpSmash, isPerfect);
+
+            // 判定テキスト表示
+            let judgeLabel = isPerfect ? 'PERFECT!!' : 'NICE SHOT!';
+            let judgeColor = cmd.color;
+            if (isJumpSmash) {
+                judgeLabel = '⚡GOD SMASH!!⚡';
+                judgeColor = '#facc15';
+            } else if (isSmash) {
+                judgeLabel = '🔥ULTRA SMASH!!🔥';
+                judgeColor = '#fb7185';
+            }
+            showJudgePopup(`${judgeLabel} +${earned}`, judgeColor);
+
+            // 返球軌道セットアップ（ワイドコート対応）
+            state.shuttleState = 'returning';
+            state.returnProgress = 0;
+            state.returnStart.copy(shuttleGroup.position);
+            state.returnIsSmash = isSmash;
+            state.returnIsJumpSmash = isJumpSmash;
+            floorDropMarker.visible = false;
+
+            if (shotType === 'clear') {
+                state.returnEnd.set((Math.random() - 0.5) * 3.0, 0.8, COACH_Z + 0.5);
+                state.returnArcHeight = 6.8;
+            } else if (shotType === 'left') {
+                state.returnEnd.set(-4.3, 0.25, -2.5);
+                state.returnArcHeight = 2.6;
+            } else if (shotType === 'right') {
+                state.returnEnd.set(4.3, 0.25, -2.5);
+                state.returnArcHeight = 2.6;
+            } else if (shotType === 'smash') {
+                state.returnEnd.set((Math.random() - 0.5) * 4.5, 0.15, -5.2);
+                state.returnArcHeight = 0.25;
+            }
+
+            clearButtonGuides();
+            hideCommandUI();
+            updateHUD();
+        }
+
+        // 【間違えた時＆不要ジャンプ時に鬼コーチに怒られる超ド派手演出＋完全一時停止】
+        function triggerRageMiss(reasonText, isFalseJump = false) {
+            if (state.missPauseTimer > 0) return; // 二重発動防止
+
+            state.shuttleState = 'missed';
+            state.shuttleActive = false;
+            floorDropMarker.visible = false;
+
+            // ミス演出中は1.65秒間完全にゲーム進行を停止させる
+            state.missPauseTimer = 1.65;
+
+            const strikePos = shuttleGroup.visible
+                ? shuttleGroup.position.clone()
+                : new THREE.Vector3(0, 0.5, HIT_ZONE_Z);
+
+            shuttleGroup.visible = false;
+            clearTrail();
+            resetJumpVisualState();
+
+            state.combo = 0;
+            state.isZone = false;
+            state.lives--;
+            state.cameraShake = 1.15;
+
+            dom.overlay.classList.remove('zone-active');
+            dom.zoneBanner.classList.add('hidden');
+            hideCommandUI();
+            updateHUD();
+
+            audio.playRageThunder();
+
+            spawnLightningStrike(strikePos);
+            courtGlowMesh.material.color.setHex(0xef4444);
+            courtGlowMesh.material.opacity = 0.88;
+
+            const quotePool = isFalseJump ? FALSE_JUMP_RAGE_QUOTES : RAGE_QUOTES;
+            const rage = quotePool[Math.floor(Math.random() * quotePool.length)];
+            dom.rageQuote.textContent = rage.text;
+            dom.rageReason.textContent = `❌ ${reasonText}`;
+
+            dom.rageOverlay.classList.remove('active');
+            dom.rageCard.classList.remove('rage-banner-slap');
+            void dom.rageOverlay.offsetWidth;
+            dom.rageOverlay.classList.add('active');
+            dom.rageCard.classList.add('rage-banner-slap');
+
+            if (state.lives <= 0) {
+                audio.speak('喝ァァ！！出直してこい！！', 1.35, 0.8);
+                setTimeout(() => {
+                    dom.rageOverlay.classList.remove('active');
+                    state.missPauseTimer = 0;
+                    gameOver();
+                }, 1550);
+            } else {
+                audio.speak(rage.voice, 1.45, 0.82);
+                // 一時停止終了時に画面をクリアし、仕切り直しの合図を出してから次の球へ
+                setTimeout(() => {
+                    if (!state.isPlaying) return;
+                    dom.rageOverlay.classList.remove('active');
+                    state.missPauseTimer = 0;
+                    state.nextServeDelay = 0.45;
+                    showJudgePopup('仕切り直し！次いくぞ！', '#38bdf8');
+                }, 1650);
+            }
+        }
+
+        function gameOver() {
+            state.isPlaying = false;
+            audio.stopBgm();
+            clearButtonGuides();
+            hideCommandUI();
+            dom.rageOverlay.classList.remove('active');
+
+            let rank = 'C';
+            let msg = '鬼コーチ「基礎からやり直しだ！フットワークを鍛えろ！」';
+            if (state.score >= 32000) {
+                rank = 'SSS';
+                msg = '鬼コーチ「バケモノめ…！お前こそ真のドパミントン王だ！！」';
+            } else if (state.score >= 18000) {
+                rank = 'SS';
+                msg = '鬼コーチ「素晴らしいスマッシュだ！脳汁が止まらんだろう！」';
+            } else if (state.score >= 9500) {
+                rank = 'S';
+                msg = '鬼コーチ「見事な反射神経だ！次はさらなる高みを目指せ！」';
+            } else if (state.score >= 4500) {
+                rank = 'A';
+                msg = '鬼コーチ「悪くない動きだ！だがまだ限界を超えられるはずだ！」';
+            } else if (state.score >= 1800) {
+                rank = 'B';
+                msg = '鬼コーチ「指示をよく聞け！ジャンプのタイミングを逃すな！」';
+            }
+
+            dom.resScore.textContent = state.score.toLocaleString();
+            dom.resCombo.textContent = state.maxCombo;
+            dom.resSmash.textContent = state.smashCount;
+            dom.resSpeed.textContent = `${state.maxSpeedKmh} km/h`;
+            dom.resRank.textContent = rank;
+            dom.resCoachMsg.textContent = msg;
+
+            dom.startView.classList.add('hidden');
+            dom.resultView.classList.remove('hidden');
+            dom.modal.classList.remove('hidden');
+        }
+
+        function showJudgePopup(text, color) {
+            dom.judge.textContent = text;
+            dom.judge.style.color = color;
+            dom.judge.classList.remove('judge-pop');
+            void dom.judge.offsetWidth;
+            dom.judge.classList.add('judge-pop');
+        }
+
+        function flashButton(btn) {
+            if (!btn) return;
+            btn.classList.add('pressed');
+            setTimeout(() => btn.classList.remove('pressed'), 110);
+        }
+
+        function updateHUD() {
+            dom.score.textContent = state.score.toLocaleString();
+            dom.speed.textContent = `${state.currentSpeedKmh} km/h`;
+            dom.combo.textContent = state.combo;
+            const hearts = '❤️'.repeat(Math.max(0, state.lives)) + '🖤'.repeat(Math.max(0, 3 - state.lives));
+            dom.lives.textContent = hearts;
+        }
+
+        /**
+         * ============================================================================
+         * 入力イベントバインディング（キーボード & タッチ/マウス両対応）
+         * ============================================================================
+         */
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase();
+
+            if (!state.isPlaying && (key === ' ' || key === 'enter')) {
+                e.preventDefault();
+                startGame();
+                return;
+            }
+
+            if (!state.isPlaying) return;
+
+            if (key === ' ' || key === 'spacebar') {
+                e.preventDefault();
+                triggerJump();
+            } else if (key === 'w' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                triggerShot('clear');
+            } else if (key === 's' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                triggerShot('smash');
+            } else if (key === 'a' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                triggerShot('left');
+            } else if (key === 'd' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                triggerShot('right');
+            }
+        });
+
+        function bindActionButton(btn, callback) {
+            const handler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                callback();
+            };
+            btn.addEventListener('pointerdown', handler);
+        }
+
+        bindActionButton(dom.btnJump, () => triggerJump());
+        bindActionButton(dom.btnClear, () => triggerShot('clear'));
+        bindActionButton(dom.btnSmash, () => triggerShot('smash'));
+        bindActionButton(dom.btnLeft, () => triggerShot('left'));
+        bindActionButton(dom.btnRight, () => triggerShot('right'));
+
+        dom.toggleGuide.addEventListener('click', () => {
+            state.guideEnabled = !state.guideEnabled;
+            dom.toggleGuide.textContent = `ガイド: ${state.guideEnabled ? 'ON' : 'OFF'}`;
+            if (state.guideEnabled && state.shuttleActive && state.shuttleState === 'incoming') {
+                updateButtonGuides(state.currentCmd);
+            } else {
+                clearButtonGuides();
+            }
+        });
+
+        dom.toggleSound.addEventListener('click', () => {
+            state.soundEnabled = !state.soundEnabled;
+            dom.toggleSound.textContent = state.soundEnabled ? '🔊 ON' : '🔇 OFF';
+        });
+
+        dom.startBtn.addEventListener('click', startGame);
+        dom.retryBtn.addEventListener('click', startGame);
+
+        /**
+         * ============================================================================
+         * メインアニメーション＆物理ループ
+         * ============================================================================
+         */
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const rawDt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+
+            // ヒットストップ処理（スマッシュ時の溜め）
+            if (state.hitStopTimer > 0) {
+                state.hitStopTimer -= rawDt;
+                renderer.render(scene, camera);
+                return;
+            }
+            const dt = rawDt;
+
+            // 1. プレイヤージャンプ物理
+            if (state.isJumping) {
+                state.jumpTimer -= dt;
+                if (state.jumpTimer <= 0) {
+                    resetJumpVisualState();
+                } else {
+                    const norm = 1 - (state.jumpTimer / state.jumpDuration);
+                    state.playerY = Math.sin(norm * Math.PI) * 2.4;
+                }
+            }
+
+            // 2. ラケットスイング＆移動追従
+            if (state.racketSwingTimer > 0) {
+                state.racketSwingTimer -= dt;
+                const swingNorm = 1 - (state.racketSwingTimer / 0.24);
+                racketGroup.rotation.x = -Math.sin(swingNorm * Math.PI) * 1.45;
+            } else {
+                racketGroup.rotation.x *= 0.85;
+            }
+            racketGroup.position.x += (state.racketTargetX - racketGroup.position.x) * 14 * dt;
+            racketGroup.position.y = 1.3 + state.playerY;
+
+            // 3. ゲーム進行＆シャトル軌道計算
+            if (state.isPlaying) {
+                // ミス演出の一時停止中は次の球出しやシャトル進行を完全にストップ
+                if (state.missPauseTimer > 0) {
+                    // ポーズ中は進行処理を行わない（エフェクトアニメーションのみ継続）
+                } else if (!state.shuttleActive) {
+                    state.nextServeDelay -= dt;
+                    if (state.nextServeDelay <= 0) {
+                        serveNextShuttle();
+                    }
+                }
+
+                if (state.missPauseTimer <= 0 && state.shuttleActive && state.shuttleState === 'incoming') {
+                    state.flightProgress += dt / state.flightDuration;
+                    const p = state.flightProgress;
+
+                    dom.timingFill.style.width = `${Math.min(100, p * 100)}%`;
+
+                    // 奥のコーチから手前の打点へ飛来
+                    const z = THREE.MathUtils.lerp(COACH_Z + 0.8, HIT_ZONE_Z, p);
+                    const arcH = state.currentCmd.jump ? 5.6 : 3.9;
+                    const y = 2.3 * (1 - p) + (state.currentCmd.jump ? 3.2 : 1.3) * p + Math.sin(p * Math.PI) * arcH;
+
+                    let targetX = 0;
+                    if (state.currentCmd.shot === 'left') targetX = -2.6;
+                    if (state.currentCmd.shot === 'right') targetX = 2.6;
+                    const x = THREE.MathUtils.lerp(0, targetX, Math.pow(p, 1.35));
+
+                    shuttleGroup.position.set(x, y, z);
+                    shuttleGroup.lookAt(x, y - 0.5, z + 2);
+                    shuttleGroup.rotation.z += dt * 16;
+
+                    // 床の着弾予測リングをシャトル真下に追従
+                    floorDropMarker.position.set(x, 0.04, z);
+                    const ringScale = 0.6 + p * 0.7;
+                    floorDropMarker.scale.setScalar(ringScale);
+
+                    const hexColor = parseInt(state.currentCmd.color.replace('#', '0x'));
+                    updateTrail(shuttleGroup.position, hexColor, 1.0);
+
+                    // 時間切れ見逃し判定
+                    if (p >= 1.05) {
+                        triggerRageMiss('反応が遅い！シャトルを落とした！');
+                    }
+                }
+
+                if (state.missPauseTimer <= 0 && state.shuttleActive && state.shuttleState === 'returning') {
+                    const speedMult = state.returnIsJumpSmash ? 5.8 : (state.returnIsSmash ? 4.8 : 2.6);
+                    state.returnProgress += dt * speedMult;
+                    const rp = Math.min(1.0, state.returnProgress);
+
+                    const pos = new THREE.Vector3().lerpVectors(state.returnStart, state.returnEnd, rp);
+                    pos.y += Math.sin(rp * Math.PI) * state.returnArcHeight;
+
+                    shuttleGroup.position.copy(pos);
+                    shuttleGroup.lookAt(state.returnEnd);
+
+                    const trailColor = state.returnIsJumpSmash ? 0xfacc15 : (state.returnIsSmash ? 0xf43f5e : 0x00ffff);
+                    const trailScale = state.returnIsJumpSmash ? 1.85 : (state.returnIsSmash ? 1.45 : 1.0);
+                    updateTrail(pos, trailColor, trailScale);
+
+                    if (rp >= 1.0) {
+                        state.shuttleActive = false;
+                        state.shuttleState = 'idle';
+                        shuttleGroup.visible = false;
+                        clearTrail();
+
+                        // スマッシュ＆ジャンプスマッシュ着弾時の超ド派手プラズマ爆発！
+                        if (state.returnIsSmash) {
+                            spawnSmashBeamImpact(pos, state.returnIsJumpSmash);
+                            state.cameraShake = Math.max(state.cameraShake, state.returnIsJumpSmash ? 0.85 : 0.5);
+                        } else {
+                            spawnHitExplosion(pos, 0x38bdf8, 18, 0.9);
+                        }
+
+                        state.nextServeDelay = Math.max(0.14, 0.36 - state.rallyCount * 0.004);
+                    }
+                }
+            }
+
+            // 4. パーティクル・衝撃波・プラズマ柱・落雷更新
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.life -= dt * pt.decay;
+                if (pt.life <= 0) {
+                    scene.remove(pt.mesh);
+                    particles.splice(i, 1);
+                } else {
+                    pt.vel.y -= 24 * dt;
+                    pt.mesh.position.addScaledVector(pt.vel, dt);
+                    pt.mesh.rotation.x += 12 * dt;
+                    pt.mesh.rotation.y += 12 * dt;
+                    pt.mesh.scale.setScalar(pt.life);
+                    pt.mesh.material.opacity = pt.life;
+                }
+            }
+
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                const sw = shockwaves[i];
+                sw.life -= dt * 2.4;
+                if (sw.life <= 0) {
+                    scene.remove(sw.mesh);
+                    shockwaves.splice(i, 1);
+                } else {
+                    const s = 1 + (1 - sw.life) * sw.expandSpeed;
+                    sw.mesh.scale.setScalar(s);
+                    sw.mesh.material.opacity = sw.life;
+                }
+            }
+
+            for (let i = plasmaPillars.length - 1; i >= 0; i--) {
+                const pl = plasmaPillars[i];
+                pl.life -= dt * 2.6;
+                if (pl.life <= 0) {
+                    scene.remove(pl.mesh);
+                    plasmaPillars.splice(i, 1);
+                } else {
+                    pl.mesh.scale.set(pl.life, 1, pl.life);
+                    pl.mesh.material.opacity = pl.life * 0.9;
+                }
+            }
+
+            for (let i = lightningBolts.length - 1; i >= 0; i--) {
+                const lb = lightningBolts[i];
+                lb.life -= dt * 3.2;
+                if (lb.life <= 0) {
+                    scene.remove(lb.mesh);
+                    lightningBolts.splice(i, 1);
+                } else {
+                    lb.mesh.material.opacity = lb.life;
+                }
+            }
+
+            // 5. コート発光＆鬼コーチオーラ＆背景演出
+            if (courtGlowMesh.material.opacity > 0) {
+                courtGlowMesh.material.opacity = Math.max(0, courtGlowMesh.material.opacity - dt * 2.1);
+            }
+            coachAura.rotation.z += dt * 2.5;
+            coachAura.scale.setScalar(1 + Math.sin(now * 0.008) * 0.14);
+
+            const bgSpeed = state.isZone ? 16 : (5 + state.rallyCount * 0.25);
+            bgCubes.forEach(c => {
+                c.position.z += bgSpeed * dt;
+                c.rotation.x += dt * 1.6;
+                c.rotation.y += dt * 2.1;
+                if (c.position.z > 18) c.position.z = -30;
+            });
+
+            // 6. カメラシェイク＆ズームパンチ（スマッシュ迫力強化）
+            let shakeX = 0, shakeY = 0;
+            if (state.cameraShake > 0) {
+                shakeX = (Math.random() - 0.5) * state.cameraShake * 0.95;
+                shakeY = (Math.random() - 0.5) * state.cameraShake * 0.95;
+                state.cameraShake = Math.max(0, state.cameraShake - dt * 3.2);
+            }
+            if (state.cameraZoomPunch > 0) {
+                state.cameraZoomPunch = Math.max(0, state.cameraZoomPunch - dt * 7.5);
+            }
+
+            camera.position.set(
+                baseCamPos.x + shakeX + racketGroup.position.x * 0.14,
+                baseCamPos.y + shakeY + state.playerY * 0.4,
+                baseCamPos.z - state.cameraZoomPunch
+            );
+            camera.lookAt(0, 1.3 + state.playerY * 0.2, -2.5);
+
+            renderer.render(scene, camera);
+        }
+
+        // リサイズ対応
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 起動
+        window.onload = () => {
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>
